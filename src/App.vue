@@ -2,7 +2,7 @@
   <div class="score-tracker-container">
     <h1 class="title">Skor Player</h1>
 
-    <!-- Player name input section -->
+    <!-- Player name input section - No change needed -->
     <div v-if="!participants.length" class="player-name-input">
       <h2 class="player-name-title">Masukkan Nama Player</h2>
       <div class="player-name-grid">
@@ -22,7 +22,7 @@
       </button>
     </div>
 
-    <!-- Player Position Grid (when players are being positioned) -->
+    <!-- Position Grid - No structural change needed -->
     <div v-if="showPositionGrid" class="position-grid-container">
       <h2 class="position-grid-title">Pilih Posisi Player</h2>
       <div class="position-grid">
@@ -39,6 +39,7 @@
     </div>
 
     <div v-if="participants.length > 0">
+      <!-- Score input section -->
       <div class="input-grid">
         <div v-for="participant in participants" :key="participant.name" class="input-group">
           <label :for="participant.name">{{ participant.name }}</label>
@@ -63,6 +64,7 @@
         Tambah Skor
       </button>
 
+      <!-- Score summary section -->
       <div class="scores-summary">
         <div v-for="participant in participants" :key="participant.name" class="participant-total">
           <span class="participant-name">{{ participant.name }}:</span>
@@ -70,7 +72,6 @@
             {{ calculateTotalScore(participant.name) }}
           </span>
 
-          <!-- New element to show score difference for lowest scoring participant -->
           <span v-if="participant.name === lowestScoringParticipant && secondLowestScoringParticipant"
             class="participant-score-difference">
             Selisih:
@@ -79,9 +80,10 @@
         </div>
       </div>
 
+      <!-- Charts section - Modified to display all player charts in one row -->
       <div class="individual-charts">
         <div v-for="(participant, index) in participants" :key="participant.name" class="individual-chart-container">
-          <h2 class="chart-title">Grafik Skor {{ participant.name }}</h2>
+          <h2 class="chart-title">{{ participant.name }}</h2>
           <div class="line-chart" :ref="`chart_${participant.name}`">
             <div class="chart-zero-line"></div>
             <div class="chart-grid">
@@ -113,6 +115,7 @@
         </div>
       </div>
 
+      <!-- Action buttons section -->
       <div class="action-buttons">
         <button @click="downloadReport" class="download-btn">
           Download Laporan (JPG)
@@ -122,9 +125,9 @@
         </button>
       </div>
 
-      <!-- Hidden canvas element yang digunakan untuk membuat gambar -->
+      <!-- Hidden canvas for report generation -->
       <div style="display: none;">
-        <canvas ref="reportCanvas" width="1000" height="3000"></canvas>
+        <canvas ref="reportCanvas" width="1400" height="2000"></canvas>
       </div>
     </div>
   </div>
@@ -836,166 +839,325 @@ export default {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
 .score-tracker-container {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
-  background-color: #f4f4f4;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(145deg, #f0f0f0, #ffffff);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   overflow-x: hidden;
   box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.score-tracker-container:hover {
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+  transform: translateY(-5px);
 }
 
 .title {
   text-align: center;
   color: #333;
   margin-bottom: 30px;
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 36px;
+  font-weight: 700;
+  background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 5px 15px rgba(59, 130, 246, 0.2);
+  letter-spacing: 1px;
+  transition: transform 0.3s ease;
+}
+
+.title:hover {
+  transform: scale(1.03);
 }
 
 .player-name-input {
-  background-color: white;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 30px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  padding: 30px;
+  border-radius: 16px;
+  margin-bottom: 40px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  transform: translateY(0);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.player-name-input:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
 }
 
 .player-name-title {
   text-align: center;
   color: #333;
-  margin-bottom: 20px;
-  font-size: 20px;
+  margin-bottom: 25px;
+  font-size: 24px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #10B981, #3B82F6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .player-name-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 15px;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .player-name-group {
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+.player-name-group:hover {
+  transform: translateY(-3px);
 }
 
 .player-name-group label {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   color: #555;
-  font-weight: semibold;
+  font-weight: 500;
+  transition: color 0.3s ease;
 }
 
 .player-name-group input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  color: black;
+  padding: 12px 15px;
+  font-size: 15px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  background-color: #f9f9f9;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.player-name-group input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  outline: none;
+  background-color: #fff;
+}
+
+.player-name-group:hover label {
+  color: #3B82F6;
 }
 
 .reset-positions-btn {
   margin-top: 2em;
   width: 100%;
-  padding: 12px;
-  background-color: #F43F5E;
+  padding: 15px;
+  background: linear-gradient(135deg, #F43F5E, #E11D48);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+.reset-positions-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
 }
 
 .reset-positions-btn:hover {
-  background-color: #E11D48;
+  transform: translateY(-3px);
+  box-shadow: 0 7px 14px rgba(244, 63, 94, 0.3);
+}
+
+.reset-positions-btn:hover:before {
+  left: 100%;
+}
+
+.reset-positions-btn:active {
+  transform: translateY(1px);
 }
 
 .random-position-button-container {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
   text-align: center;
 }
 
 .random-positions-btn {
-  width: 100%;
-  padding: 12px;
-  background-color: #8B5CF6;
-  /* Purple accent */
+  width: 30%;
+  padding: 15px;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+.random-positions-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
 }
 
 .random-positions-btn:hover {
-  background-color: #7C3AED;
+  transform: translateY(-3px);
+  box-shadow: 0 7px 14px rgba(139, 92, 246, 0.3);
+}
+
+.random-positions-btn:hover:before {
+  left: 100%;
+}
+
+.random-positions-btn:active {
+  transform: translateY(1px);
 }
 
 .save-players-btn {
-  width: 100%;
-  padding: 12px;
-  background-color: #10B981;
+  width: 30%;
+  padding: 15px;
+  background: linear-gradient(135deg, #10B981, #059669);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+.save-players-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
 }
 
 .save-players-btn:hover {
-  background-color: #059669;
+  transform: translateY(-3px);
+  box-shadow: 0 7px 14px rgba(16, 185, 129, 0.3);
+}
+
+.save-players-btn:hover:before {
+  left: 100%;
+}
+
+.save-players-btn:active {
+  transform: translateY(1px);
 }
 
 .position-grid-container {
   background-color: white;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 30px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  border-radius: 16px;
+  margin-bottom: 40px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.position-grid-container:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
 }
 
 .position-grid-title {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   color: #333;
-  font-size: 20px;
+  font-size: 24px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #8B5CF6, #3B82F6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .position-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
+  gap: 20px;
 }
 
 .position-grid-cell {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 15px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  font-weight: bold;
+  padding: 20px;
+  border: 3px solid #eee;
+  border-radius: 12px;
+  font-weight: 600;
   cursor: default;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  font-size: 16px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
 }
 
 .position-grid-cell.selectable {
   border-color: #10B981;
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: rgba(16, 185, 129, 0.05);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.position-grid-cell.selectable:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+  transition: 0.5s;
 }
 
 .position-grid-cell.selectable:hover {
-  background-color: rgba(16, 185, 129, 0.2);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(16, 185, 129, 0.2);
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.position-grid-cell.selectable:hover:before {
+  left: 100%;
 }
 
 .position-grid-cell.occupied {
   background-color: #f0f0f0;
   color: #666;
+  border-color: #ddd;
+  transform: scale(1);
 }
 
-/* Rest of the existing styles remain the same as in the previous complete code */
 .input-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1008,12 +1170,23 @@ export default {
   display: flex;
   flex-direction: column;
   width: 100%;
+  transition: transform 0.3s ease;
+  position: relative;
+}
+
+.input-group:hover {
+  transform: translateY(-3px);
 }
 
 .input-group label {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   color: #555;
-  font-weight: semibold;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.input-group:hover label {
+  color: #3B82F6;
 }
 
 .input-with-buttons {
@@ -1026,11 +1199,21 @@ export default {
   width: 100%;
   background: white;
   color: black;
-  padding: 8px;
-  padding-right: 60px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 12px;
+  padding-right: 70px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 500;
   box-sizing: border-box;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.input-with-buttons input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  outline: none;
 }
 
 .input-buttons {
@@ -1040,21 +1223,27 @@ export default {
   height: 100%;
   display: flex;
   align-items: center;
+  padding-right: 8px;
 }
 
 .thumb-button {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 20px;
   padding: 5px;
-  margin: 0 2px;
+  margin: 0 3px;
   border-radius: 50%;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .thumb-button:hover {
-  transform: scale(1.2);
+  transform: scale(1.3);
 }
 
 .thumb-up {
@@ -1067,7 +1256,22 @@ export default {
 
 .thumb-button.active {
   transform: scale(1.2);
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 .thumb-up.active {
@@ -1076,36 +1280,82 @@ export default {
 
 .thumb-down.active {
   background-color: rgba(239, 68, 68, 0.2);
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
 }
 
 .add-score-btn {
   width: 100%;
-  padding: 12px;
-  background-color: #3B82F6;
+  padding: 15px;
+  background: linear-gradient(135deg, #3B82F6, #2563EB);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
-  margin-bottom: 30px;
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 35px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+.add-score-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
 }
 
 .add-score-btn:hover {
-  background-color: #2563EB;
+  transform: translateY(-3px);
+  box-shadow: 0 7px 14px rgba(59, 130, 246, 0.3);
+}
+
+.add-score-btn:hover:before {
+  left: 100%;
+}
+
+.add-score-btn:active {
+  transform: translateY(1px);
 }
 
 .scores-summary {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-around;
-  background-color: white;
+  background: linear-gradient(145deg, #ffffff, #f8f8f8);
   padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 30px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  margin-bottom: 25px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
   width: 100%;
   box-sizing: border-box;
   gap: 10px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.scores-summary:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
 }
 
 .participant-total {
@@ -1115,62 +1365,126 @@ export default {
   padding: 10px;
   flex: 1;
   min-width: 80px;
-  max-width: 130px;
+  max-width: 150px;
+  transition: transform 0.3s ease;
+  position: relative;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  background-color: white;
+}
+
+.participant-total:hover {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+  z-index: 1;
 }
 
 .participant-name {
-  color: #666;
-  margin-bottom: 5px;
+  color: #555;
+  margin-bottom: 8px;
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 600;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
+  transition: color 0.3s ease;
+}
+
+.participant-total:hover .participant-name {
+  color: #3B82F6;
 }
 
 .participant-total-score {
-  font-size: 40px;
-  font-weight: bold;
+  font-size: 45px;
+  font-weight: 700;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.participant-total:hover .participant-total-score {
+  transform: scale(1.1);
 }
 
 .individual-charts {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  margin-bottom: 40px;
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
 .individual-chart-container {
-  background-color: white;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(145deg, #ffffff, #f8f8f8);
+  border-radius: 16px;
+  padding: 25px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.individual-chart-container:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+}
+
+.individual-chart-container:before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+.individual-chart-container:hover:before {
+  top: 0;
 }
 
 .chart-title {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 25px;
   color: #333;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #3B82F6, #10B981);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: transform 0.3s ease;
+}
+
+.individual-chart-container:hover .chart-title {
+  transform: scale(1.05);
 }
 
 .line-chart {
   position: relative;
-  height: 300px;
+  height: 250px;
   width: 100%;
   border-left: 2px solid #ddd;
   border-bottom: 2px solid #ddd;
   margin-bottom: 40px;
+  transition: all 0.4s ease;
+}
+
+.individual-chart-container:hover .line-chart {
+  border-color: #3B82F6;
 }
 
 .chart-zero-line {
   position: absolute;
   left: 50px;
   right: 0;
-  border-top: 1px dashed #888;
+  border-top: 1px dashed #aaa;
   top: 50%;
+  transition: border-color 0.3s ease;
+}
+
+.individual-chart-container:hover .chart-zero-line {
+  border-top-color: #3B82F6;
 }
 
 .chart-grid {
@@ -1187,6 +1501,8 @@ export default {
   height: 100%;
   top: 0;
   left: 0;
+  border-radius: 8px;
+  transition: all 0.4s ease;
 }
 
 .chart-svg {
@@ -1195,16 +1511,37 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
+  transition: all 0.5s ease;
+}
+
+.individual-chart-container:hover .chart-svg polyline {
+  stroke-width: 3;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: dash 2s forwards;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .line-point {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   transform: translate(-50%, 50%);
   z-index: 10;
   cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.line-point:hover {
+  transform: translate(-50%, 50%) scale(1.5);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
 }
 
 .chart-x-axis {
@@ -1216,14 +1553,8 @@ export default {
   justify-content: space-between;
   color: #666;
   font-size: 12px;
-}
-
-.participant-score-difference {
-  font-size: 20px;
-  color: #888;
-  margin-top: 5px;
-  text-align: center;
-  width: 100%;
+  font-weight: 500;
+  transition: color 0.3s ease;
 }
 
 .chart-y-axis {
@@ -1239,40 +1570,126 @@ export default {
   padding-right: 10px;
   color: #666;
   font-size: 12px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.individual-chart-container:hover .chart-x-axis,
+.individual-chart-container:hover .chart-y-axis {
+  color: #333;
+}
+
+.participant-score-difference {
+  font-size: 18px;
+  color: #666;
+  margin-top: 8px;
+  text-align: center;
+  width: 100%;
+  transition: all 0.3s ease;
+  animation: fadeIn 1s ease-in-out;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.participant-total:hover .participant-score-difference {
+  color: #3B82F6;
 }
 
 .action-buttons {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 30px;
+  margin-top: 20px;
 }
 
 .download-btn {
-  padding: 12px 24px;
-  background-color: #10B981;
+  padding: 15px 30px;
+  background: linear-gradient(135deg, #10B981, #059669);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+}
+
+.download-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
 }
 
 .download-btn:hover {
-  background-color: #059669;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+}
+
+.download-btn:hover:before {
+  left: 100%;
+}
+
+.download-btn:active {
+  transform: translateY(1px);
 }
 
 .reset-data-btn {
-  padding: 12px 24px;
-  background-color: #EF4444;
+  padding: 15px 30px;
+  background: linear-gradient(135deg, #EF4444, #DC2626);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+}
+
+.reset-data-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
 }
 
 .reset-data-btn:hover {
-  background-color: #DC2626;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+}
+
+.reset-data-btn:hover:before {
+  left: 100%;
+}
+
+.reset-data-btn:active {
+  transform: translateY(1px);
 }
 
 @media (max-width: 768px) {
@@ -1291,7 +1708,7 @@ export default {
   .action-buttons {
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
   }
 
   .download-btn,
@@ -1316,6 +1733,78 @@ export default {
 
   .participant-total {
     margin-bottom: 15px;
+    max-width: 100%;
   }
+}
+
+/* Animations */
+@keyframes slideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Apply animations to containers */
+.player-name-input,
+.position-grid-container,
+.scores-summary,
+.individual-chart-container,
+.input-grid {
+  animation: fadeScale 0.6s ease-out;
+}
+
+.participant-total {
+  animation: slideIn 0.6s ease-out;
+  animation-fill-mode: both;
+}
+
+.participant-total:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.participant-total:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.participant-total:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.participant-total:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+/* Glassmorphism effects */
+.scores-summary,
+.individual-chart-container {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.position-grid-cell.selectable {
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 </style>
