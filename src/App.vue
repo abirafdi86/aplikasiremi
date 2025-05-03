@@ -130,6 +130,7 @@
         <canvas ref="reportCanvas" width="1400" height="2000"></canvas>
       </div>
     </div>
+    <p class="copyright">© 2025 by Abi Rafdi</p>
   </div>
 </template>
 
@@ -354,6 +355,18 @@ export default {
     },
 
     addScores() {
+      // Validate that all scores are filled in
+      const missingScores = this.participants.some(participant => {
+        return this.currentScore[participant.name] === null ||
+          this.currentScore[participant.name] === undefined ||
+          this.currentScore[participant.name] === '';
+      });
+
+      if (missingScores) {
+        alert('Harap isi semua skor player sebelum menambahkan!');
+        return;
+      }
+
       // Validate and prepare scores
       const newScoreEntry = this.participants.map(participant => ({
         name: participant.name,
@@ -840,6 +853,14 @@ export default {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+.copyright {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+  margin-top: 70px;
+  font-style: italic;
+}
 
 .score-tracker-container {
   width: 100%;
