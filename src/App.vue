@@ -998,7 +998,7 @@ export default {
 }
 
 .random-positions-btn {
-  width: 30%;
+  width: 100%;
   padding: 15px;
   background: linear-gradient(135deg, #8B5CF6, #6D28D9);
   color: white;
@@ -1038,7 +1038,7 @@ export default {
 }
 
 .save-players-btn {
-  width: 30%;
+  width: 100%;
   padding: 15px;
   background: linear-gradient(135deg, #10B981, #059669);
   color: white;
