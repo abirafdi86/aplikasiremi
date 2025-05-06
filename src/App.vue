@@ -1,139 +1,53 @@
 <template>
   <div class="score-tracker-container">
-    <h1 class="title">Skor Player</h1>
-
-    <div class="live-score-controls">
-      <div v-if="!liveMode" class="create-room-section">
-        <button @click="createLiveRoom" class="create-room-btn">
-          <span class="btn-icon">📡</span> Mulai Live Score
-        </button>
-      </div>
-
-      <div v-if="liveMode" class="live-mode-active">
+    <!-- Tampilan berbeda untuk host/admin dan viewer -->
+    <div v-if="liveMode && !isHost" class="viewer-mode">
+      <!-- Header Viewer Mode -->
+      <div class="viewer-header">
+        <h1 class="title">Live Score</h1>
         <div class="live-status">
           <span class="status-indicator" :class="connectionStatus"></span>
-          <span v-if="isHost">Host Mode</span>
-          <span v-else>Viewer Mode</span>
+          <span v-if="connectionStatus === 'connected'" class="status-text connected">
+            Terhubung ke Live Score
+          </span>
+          <span v-else-if="connectionStatus === 'connecting'" class="status-text connecting">
+            Menghubungkan ke Live Score...
+          </span>
+          <span v-else-if="connectionStatus === 'waiting'" class="status-text waiting">
+            Menunggu data dari host...
+          </span>
+          <span v-else-if="connectionStatus === 'failed'" class="status-text failed">
+            Gagal terhubung ke room
+          </span>
+          <span v-else-if="connectionStatus === 'error'" class="status-text error">
+            Error saat memuat data
+          </span>
           <span v-if="lastUpdateTime" class="last-update">
             Update terakhir: {{ formatTime(lastUpdateTime) }}
           </span>
         </div>
-
-        <div v-if="isHost" class="share-link">
-          <span>Link Tonton:</span>
-          <input type="text" readonly :value="watchUrl" class="watch-url-input" />
-          <button @click="copyWatchUrl" class="copy-url-btn">Salin</button>
-          <span v-if="viewers > 0" class="viewers-count">
-            {{ viewers }} penonton
-          </span>
-        </div>
-
-        <button @click="stopLiveMode" class="stop-live-btn">
-          <span class="btn-icon">⏹️</span> Hentikan Live Score
+        <button @click="stopLiveMode" class="stop-live-btn small">
+          Kembali
         </button>
       </div>
-    </div>
 
-    <div v-if="liveMode && !isHost" class="viewer-display">
-      <div class="connection-status">
-        <span v-if="connectionStatus === 'connected'" class="status-text connected">
-          Terhubung ke Live Score
-        </span>
-        <span v-else-if="connectionStatus === 'connecting'" class="status-text connecting">
-          Menghubungkan ke Live Score...
-        </span>
-        <span v-else-if="connectionStatus === 'waiting'" class="status-text waiting">
-          Menunggu data dari host...
-        </span>
-        <span v-else-if="connectionStatus === 'failed'" class="status-text failed">
-          Gagal terhubung ke room
-        </span>
-        <span v-else-if="connectionStatus === 'error'" class="status-text error">
-          Error saat memuat data
-        </span>
-      </div>
-    </div>
-    <!-- Player name input section - No change needed -->
-    <div v-if="!participants.length" class="player-name-input">
-      <h2 class="player-name-title">Masukkan Nama Player</h2>
-      <div class="player-name-grid">
-        <div v-for="(_, index) in 4" :key="index" class="player-name-group">
-          <label :for="`player-${index + 1}`">Player {{ index + 1 }}</label>
-          <input :id="`player-${index + 1}`" type="text" v-model="playerNameInputs[index]"
-            :placeholder="`Nama Player ${index + 1}`" />
-        </div>
-      </div>
-      <div class="random-position-button-container">
-        <button @click="generateRandomPositions" class="random-positions-btn">
-          Acak Posisi Player
-        </button>
-      </div>
-      <button @click="savePlayerNames" class="save-players-btn">
-        Simpan Nama Player
-      </button>
-    </div>
-
-    <!-- Position Grid - No structural change needed -->
-    <div v-if="showPositionGrid" class="position-grid-container">
-      <h2 class="position-grid-title">Pilih Posisi Player</h2>
-      <div class="position-grid">
-        <div v-for="(cell, index) in positionGrid" :key="index" class="position-grid-cell"
-          :class="{ 'occupied': cell !== null, 'selectable': cell === null }" @click="selectPosition(index)">
-          <span style="color: gray;">{{ cell !== null ? cell : 'Pilih' }}</span>
-        </div>
-      </div>
-      <div class="random-position-button-container">
-        <button @click="resetPositionGrid" class="reset-positions-btn">
-          Reset Posisi
-        </button>
-      </div>
-    </div>
-
-    <div v-if="participants.length > 0">
-      <!-- Score input section -->
-      <div class="input-grid">
-        <div v-for="participant in participants" :key="participant.name" class="input-group">
-          <label :for="participant.name">{{ participant.name }}</label>
-          <div class="input-with-buttons">
-            <input :id="participant.name" type="number" v-model.number="currentScore[participant.name]"
-              :placeholder="`Skor ${participant.name}`" />
-            <div class="input-buttons">
-              <button @click="markScorePositive(participant.name)" class="thumb-button thumb-up"
-                :class="{ 'active': scoreMarks[participant.name] === 'positive' }" title="Tandai Positif">
-                👍
-              </button>
-              <button @click="markScoreNegative(participant.name)" class="thumb-button thumb-down"
-                :class="{ 'active': scoreMarks[participant.name] === 'negative' }" title="Tandai Negatif">
-                👎
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button @click="addScores" class="add-score-btn">
-        Tambah Skor
-      </button>
-
-      <!-- Score summary section -->
-      <div class="scores-summary">
-        <div v-for="participant in participants" :key="participant.name" class="participant-total">
+      <!-- Score Summary untuk Viewer -->
+      <div v-if="participants.length > 0" class="viewer-scores-summary">
+        <div v-for="participant in participants" :key="participant.name" class="viewer-participant-total">
           <span class="participant-name">{{ participant.name }}:</span>
           <span class="participant-total-score" :style="{ color: getScoreColor(participant.name) }">
             {{ calculateTotalScore(participant.name) }}
           </span>
-
           <span v-if="participant.name === lowestScoringParticipant && secondLowestScoringParticipant"
             class="participant-score-difference">
-            Selisih:
-            <span style="font-weight: bold;">{{ calculateScoreDifference() }}</span>
+            (Selisih: {{ calculateScoreDifference() }})
           </span>
         </div>
       </div>
 
-      <!-- Charts section - Modified to display all player charts in one row -->
-      <div class="individual-charts">
-        <div v-for="(participant, index) in participants" :key="participant.name" class="individual-chart-container">
+      <!-- Charts untuk Viewer -->
+      <div v-if="participants.length > 0" class="viewer-charts">
+        <div v-for="(participant, index) in participants" :key="participant.name" class="viewer-chart-container">
           <h2 class="chart-title">{{ participant.name }}</h2>
           <div class="line-chart" :ref="`chart_${participant.name}`">
             <div class="chart-zero-line"></div>
@@ -165,20 +79,171 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Action buttons section -->
-      <div class="action-buttons">
-        <button @click="downloadReport" class="download-btn">
-          Download Laporan (JPG)
-        </button>
-        <button @click="resetData" class="reset-data-btn">
-          Reset Data
+    <!-- Tampilan Host/Admin Mode -->
+    <div v-else>
+      <h1 class="title">Skor Player</h1>
+
+      <div class="live-score-controls">
+        <div v-if="!liveMode" class="create-room-section">
+          <button @click="createLiveRoom" class="create-room-btn">
+            <span class="btn-icon">📡</span> Mulai Live Score
+          </button>
+        </div>
+
+        <div v-if="liveMode" class="live-mode-active">
+          <div class="live-status">
+            <span class="status-indicator" :class="connectionStatus"></span>
+            <span v-if="isHost">Host Mode</span>
+            <span v-else>Viewer Mode</span>
+            <span v-if="lastUpdateTime" class="last-update">
+              Update terakhir: {{ formatTime(lastUpdateTime) }}
+            </span>
+          </div>
+
+          <div v-if="isHost" class="share-link">
+            <span>Link Tonton:</span>
+            <input type="text" readonly :value="watchUrl" class="watch-url-input" />
+            <button @click="copyWatchUrl" class="copy-url-btn">Salin</button>
+            <span v-if="viewers > 0" class="viewers-count">
+              {{ viewers }} penonton
+            </span>
+          </div>
+
+          <button @click="stopLiveMode" class="stop-live-btn">
+            <span class="btn-icon">⏹️</span> Hentikan Live Score
+          </button>
+        </div>
+      </div>
+
+      <!-- Player name input section - No change needed -->
+      <div v-if="!participants.length" class="player-name-input">
+        <h2 class="player-name-title">Masukkan Nama Player</h2>
+        <div class="player-name-grid">
+          <div v-for="(_, index) in 4" :key="index" class="player-name-group">
+            <label :for="`player-${index + 1}`">Player {{ index + 1 }}</label>
+            <input :id="`player-${index + 1}`" type="text" v-model="playerNameInputs[index]"
+              :placeholder="`Nama Player ${index + 1}`" />
+          </div>
+        </div>
+        <div class="random-position-button-container">
+          <button @click="generateRandomPositions" class="random-positions-btn">
+            Acak Posisi Player
+          </button>
+        </div>
+        <button @click="savePlayerNames" class="save-players-btn">
+          Simpan Nama Player
         </button>
       </div>
 
-      <!-- Hidden canvas for report generation -->
-      <div style="display: none;">
-        <canvas ref="reportCanvas" width="1400" height="2000"></canvas>
+      <!-- Position Grid - No structural change needed -->
+      <div v-if="showPositionGrid" class="position-grid-container">
+        <h2 class="position-grid-title">Pilih Posisi Player</h2>
+        <div class="position-grid">
+          <div v-for="(cell, index) in positionGrid" :key="index" class="position-grid-cell"
+            :class="{ 'occupied': cell !== null, 'selectable': cell === null }" @click="selectPosition(index)">
+            <span style="color: gray;">{{ cell !== null ? cell : 'Pilih' }}</span>
+          </div>
+        </div>
+        <div class="random-position-button-container">
+          <button @click="resetPositionGrid" class="reset-positions-btn">
+            Reset Posisi
+          </button>
+        </div>
+      </div>
+
+      <div v-if="participants.length > 0">
+        <!-- Score input section -->
+        <div class="input-grid">
+          <div v-for="participant in participants" :key="participant.name" class="input-group">
+            <label :for="participant.name">{{ participant.name }}</label>
+            <div class="input-with-buttons">
+              <input :id="participant.name" type="number" v-model.number="currentScore[participant.name]"
+                :placeholder="`Skor ${participant.name}`" />
+              <div class="input-buttons">
+                <button @click="markScorePositive(participant.name)" class="thumb-button thumb-up"
+                  :class="{ 'active': scoreMarks[participant.name] === 'positive' }" title="Tandai Positif">
+                  👍
+                </button>
+                <button @click="markScoreNegative(participant.name)" class="thumb-button thumb-down"
+                  :class="{ 'active': scoreMarks[participant.name] === 'negative' }" title="Tandai Negatif">
+                  👎
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button @click="addScores" class="add-score-btn">
+          Tambah Skor
+        </button>
+
+        <!-- Score summary section -->
+        <div class="scores-summary">
+          <div v-for="participant in participants" :key="participant.name" class="participant-total">
+            <span class="participant-name">{{ participant.name }}:</span>
+            <span class="participant-total-score" :style="{ color: getScoreColor(participant.name) }">
+              {{ calculateTotalScore(participant.name) }}
+            </span>
+
+            <span v-if="participant.name === lowestScoringParticipant && secondLowestScoringParticipant"
+              class="participant-score-difference">
+              Selisih:
+              <span style="font-weight: bold;">{{ calculateScoreDifference() }}</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Charts section - Modified to display all player charts in one row -->
+        <div class="individual-charts">
+          <div v-for="(participant, index) in participants" :key="participant.name" class="individual-chart-container">
+            <h2 class="chart-title">{{ participant.name }}</h2>
+            <div class="line-chart" :ref="`chart_${participant.name}`">
+              <div class="chart-zero-line"></div>
+              <div class="chart-grid">
+                <div class="line-track" :style="{ backgroundColor: getChartBackgroundColor(index) }">
+                  <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <polyline :points="generatePolylinePoints(participant.name)"
+                      :stroke="getParticipantColor(participant.name)" fill="none" stroke-width="2" />
+                  </svg>
+
+                  <div v-for="(point, pointIndex) in calculateCumulativePoints(participant.name)" :key="pointIndex"
+                    class="line-point" :style="{
+                      left: `${(pointIndex / (Math.max(scores.length - 1, 1))) * 100}%`,
+                      bottom: calculatePointPosition(participant.name, point),
+                      backgroundColor: getParticipantColor(participant.name)
+                    }" :title="`Round ${pointIndex + 1}: ${point}`"></div>
+                </div>
+              </div>
+              <div class="chart-x-axis">
+                <span v-for="(_, index) in scores" :key="index">
+                  {{ index + 1 }}
+                </span>
+              </div>
+              <div class="chart-y-axis">
+                <span v-for="n in 5" :key="n">
+                  {{ formatYAxisLabel(calculateYAxisValue(n)) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons section -->
+        <div class="action-buttons">
+          <button @click="downloadReport" class="download-btn">
+            Download Laporan (JPG)
+          </button>
+          <button @click="resetData" class="reset-data-btn">
+            Reset Data
+          </button>
+        </div>
+
+        <!-- Hidden canvas for report generation -->
+        <div style="display: none;">
+          <canvas ref="reportCanvas" width="1400" height="2000"></canvas>
+        </div>
       </div>
     </div>
     <p class="copyright">© 2025 by Abi Rafdi</p>
@@ -1247,6 +1312,127 @@ export default {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
+.viewer-mode {
+  max-width: 100%;
+  padding: 10px;
+}
+
+.viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  background-color: #b8bfc7;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.viewer-header .title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.viewer-header .stop-live-btn.small {
+  font-size: 0.9rem;
+  padding: 5px 10px;
+  background-color: #6c757d;
+}
+
+.viewer-scores-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.viewer-participant-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border-radius: 30px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.viewer-participant-total .participant-name {
+  font-weight: bold;
+}
+
+.viewer-participant-total .participant-total-score {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+.viewer-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.viewer-chart-container {
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.status-indicator.connected {
+  background-color: #10B981;
+  /* Hijau */
+  box-shadow: 0 0 8px #10B981;
+}
+
+.status-indicator.connecting,
+.status-indicator.waiting {
+  background-color: #F59E0B;
+  /* Kuning */
+  box-shadow: 0 0 8px #F59E0B;
+  animation: pulse 1.5s infinite;
+}
+
+.status-indicator.failed,
+.status-indicator.error {
+  background-color: #EF4444;
+  /* Merah */
+  box-shadow: 0 0 8px #EF4444;
+}
+
+.status-indicator.disconnected {
+  background-color: #6B7280;
+  /* Abu-abu */
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
 .live-score-controls {
   margin: 20px 0;
   padding: 15px;
@@ -2302,6 +2488,25 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .viewer-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .viewer-header .stop-live-btn.small {
+    align-self: flex-end;
+  }
+
+  .viewer-scores-summary {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .viewer-charts {
+    grid-template-columns: 1fr;
+  }
+
   .share-link {
     flex-direction: column;
     align-items: flex-start;
