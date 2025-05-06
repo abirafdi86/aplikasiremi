@@ -2,6 +2,57 @@
   <div class="score-tracker-container">
     <h1 class="title">Skor Player</h1>
 
+    <div class="live-score-controls">
+      <div v-if="!liveMode" class="create-room-section">
+        <button @click="createLiveRoom" class="create-room-btn">
+          <span class="btn-icon">📡</span> Mulai Live Score
+        </button>
+      </div>
+
+      <div v-if="liveMode" class="live-mode-active">
+        <div class="live-status">
+          <span class="status-indicator" :class="connectionStatus"></span>
+          <span v-if="isHost">Host Mode</span>
+          <span v-else>Viewer Mode</span>
+          <span v-if="lastUpdateTime" class="last-update">
+            Update terakhir: {{ formatTime(lastUpdateTime) }}
+          </span>
+        </div>
+
+        <div v-if="isHost" class="share-link">
+          <span>Link Tonton:</span>
+          <input type="text" readonly :value="watchUrl" class="watch-url-input" />
+          <button @click="copyWatchUrl" class="copy-url-btn">Salin</button>
+          <span v-if="viewers > 0" class="viewers-count">
+            {{ viewers }} penonton
+          </span>
+        </div>
+
+        <button @click="stopLiveMode" class="stop-live-btn">
+          <span class="btn-icon">⏹️</span> Hentikan Live Score
+        </button>
+      </div>
+    </div>
+
+    <div v-if="liveMode && !isHost" class="viewer-display">
+      <div class="connection-status">
+        <span v-if="connectionStatus === 'connected'" class="status-text connected">
+          Terhubung ke Live Score
+        </span>
+        <span v-else-if="connectionStatus === 'connecting'" class="status-text connecting">
+          Menghubungkan ke Live Score...
+        </span>
+        <span v-else-if="connectionStatus === 'waiting'" class="status-text waiting">
+          Menunggu data dari host...
+        </span>
+        <span v-else-if="connectionStatus === 'failed'" class="status-text failed">
+          Gagal terhubung ke room
+        </span>
+        <span v-else-if="connectionStatus === 'error'" class="status-text error">
+          Error saat memuat data
+        </span>
+      </div>
+    </div>
     <!-- Player name input section - No change needed -->
     <div v-if="!participants.length" class="player-name-input">
       <h2 class="player-name-title">Masukkan Nama Player</h2>
@@ -135,6 +186,7 @@
 </template>
 
 <script>
+import { ref, onMounted, onUnmounted } from 'vue';
 export default {
   data() {
     return {
@@ -151,10 +203,21 @@ export default {
       ],
       currentScore: {},
       scoreMarks: {},
-      scores: []
+      scores: [],
+      liveMode: false,
+      isHost: false,
+      roomId: '',
+      viewers: 0,
+      lastUpdateTime: null,
+      syncInterval: null,
+      connectionStatus: 'disconnected',
     }
   },
   computed: {
+    watchUrl() {
+      if (!this.roomId) return '';
+      return `${window.location.origin}${window.location.pathname}?room=${this.roomId}`;
+    },
     chartRange() {
       if (this.scores.length === 0) return { min: 0, max: 100 }
 
@@ -196,9 +259,191 @@ export default {
   },
   created() {
     // Load saved data when component is created
-    this.loadSavedState()
+    this.loadSavedState();
+
+    // Check URL for room parameter
+    this.checkForRoomInUrl();
   },
   methods: {
+    formatTime(date) {
+      if (!date) return '';
+
+      const now = new Date();
+      const diff = Math.floor((now - date) / 1000);
+
+      if (diff < 5) {
+        return 'baru saja';
+      } else if (diff < 60) {
+        return `${diff} detik yang lalu`;
+      } else if (diff < 3600) {
+        return `${Math.floor(diff / 60)} menit yang lalu`;
+      } else {
+        return `${Math.floor(diff / 3600)} jam yang lalu`;
+      }
+    },
+
+    copyWatchUrl() {
+      const input = document.querySelector('.watch-url-input');
+      if (!input) return;
+
+      input.select();
+      document.execCommand('copy');
+
+      alert('Link berhasil disalin ke clipboard!');
+    },
+    createLiveRoom() {
+      // Generate a unique room ID (timestamp + random string)
+      this.roomId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      this.isHost = true;
+      this.liveMode = true;
+      this.connectionStatus = 'connected';
+
+      // Start syncing data to localStorage with the room prefix
+      this.syncToLocalStorage();
+
+      // Set up interval to keep syncing
+      this.syncInterval = setInterval(() => {
+        this.syncToLocalStorage();
+      }, 3000);
+
+      // Initialize viewers count
+      this.viewers = 0;
+
+      // Store room info in localStorage
+      localStorage.setItem(`skorLiveRoom_${this.roomId}_host`, JSON.stringify({
+        created: new Date().toISOString(),
+        lastActive: new Date().toISOString()
+      }));
+
+      // Show alert with watch URL
+      this.$nextTick(() => {
+        alert(`Room berhasil dibuat!\nBagikan link ini untuk ditonton: ${this.watchUrl}`);
+      });
+    },
+
+    joinLiveRoom(roomId) {
+      if (!roomId) return;
+
+      this.roomId = roomId;
+      this.isHost = false;
+      this.liveMode = true;
+      this.connectionStatus = 'connecting';
+
+      // Try to load data from localStorage with the room prefix
+      this.loadLiveData();
+
+      // Set up interval to keep loading updates
+      this.syncInterval = setInterval(() => {
+        this.loadLiveData();
+      }, 2000);
+
+      // Register as viewer
+      this.registerViewer();
+    },
+
+    syncToLocalStorage() {
+      if (!this.roomId || !this.isHost) return;
+
+      // Update the data
+      const liveData = {
+        participants: this.participants,
+        scores: this.scores,
+        lastUpdate: new Date().toISOString(),
+        viewers: this.viewers
+      };
+
+      localStorage.setItem(`skorLiveRoom_${this.roomId}_data`, JSON.stringify(liveData));
+      localStorage.setItem(`skorLiveRoom_${this.roomId}_host`, JSON.stringify({
+        created: new Date().toISOString(),
+        lastActive: new Date().toISOString()
+      }));
+
+      this.lastUpdateTime = new Date();
+    },
+
+    loadLiveData() {
+      if (!this.roomId || this.isHost) return;
+
+      // Check if room exists
+      const hostData = localStorage.getItem(`skorLiveRoom_${this.roomId}_host`);
+      if (!hostData) {
+        this.connectionStatus = 'failed';
+        return;
+      }
+
+      // Load data from localStorage
+      const liveDataStr = localStorage.getItem(`skorLiveRoom_${this.roomId}_data`);
+      if (!liveDataStr) {
+        this.connectionStatus = 'waiting';
+        return;
+      }
+
+      try {
+        const liveData = JSON.parse(liveDataStr);
+
+        // Update the local data
+        this.participants = liveData.participants;
+        this.scores = liveData.scores;
+        this.viewers = liveData.viewers;
+        this.lastUpdateTime = new Date(liveData.lastUpdate);
+        this.connectionStatus = 'connected';
+      } catch (e) {
+        console.error('Error parsing live data:', e);
+        this.connectionStatus = 'error';
+      }
+    },
+
+    registerViewer() {
+      if (!this.roomId || this.isHost) return;
+
+      // Generate a viewer ID
+      const viewerId = Math.random().toString(36).substr(2, 9);
+
+      // Store viewer info
+      localStorage.setItem(`skorLiveRoom_${this.roomId}_viewer_${viewerId}`, JSON.stringify({
+        joined: new Date().toISOString(),
+        lastActive: new Date().toISOString()
+      }));
+
+      // Update viewer count for host
+      const liveDataStr = localStorage.getItem(`skorLiveRoom_${this.roomId}_data`);
+      if (liveDataStr) {
+        try {
+          const liveData = JSON.parse(liveDataStr);
+          liveData.viewers = (liveData.viewers || 0) + 1;
+          localStorage.setItem(`skorLiveRoom_${this.roomId}_data`, JSON.stringify(liveData));
+        } catch (e) {
+          console.error('Error updating viewer count:', e);
+        }
+      }
+
+      // Set up interval to keep viewer active
+      setInterval(() => {
+        localStorage.setItem(`skorLiveRoom_${this.roomId}_viewer_${viewerId}`, JSON.stringify({
+          joined: new Date().toISOString(),
+          lastActive: new Date().toISOString()
+        }));
+      }, 5000);
+    },
+
+    stopLiveMode() {
+      if (this.syncInterval) {
+        clearInterval(this.syncInterval);
+        this.syncInterval = null;
+      }
+
+      this.liveMode = false;
+
+      if (this.isHost) {
+        // Remove room data
+        localStorage.removeItem(`skorLiveRoom_${this.roomId}_data`);
+        localStorage.removeItem(`skorLiveRoom_${this.roomId}_host`);
+      }
+
+      this.roomId = '';
+      this.isHost = false;
+      this.connectionStatus = 'disconnected';
+    },
     calculateScoreDifference() {
       if (!this.lowestScoringParticipant || !this.secondLowestScoringParticipant) return 0;
 
@@ -355,7 +600,7 @@ export default {
     },
 
     addScores() {
-      // Validate that all scores are filled in
+      // All the original code from your addScores method
       const missingScores = this.participants.some(participant => {
         return this.currentScore[participant.name] === null ||
           this.currentScore[participant.name] === undefined ||
@@ -367,24 +612,27 @@ export default {
         return;
       }
 
-      // Validate and prepare scores
       const newScoreEntry = this.participants.map(participant => ({
         name: participant.name,
         score: this.currentScore[participant.name] || 0,
-        mark: this.scoreMarks[participant.name] // Tambahkan informasi penanda (positif/negatif)
-      }))
+        mark: this.scoreMarks[participant.name]
+      }));
 
-      // Add to scores history
-      this.scores.push(newScoreEntry)
+      this.scores.push(newScoreEntry);
 
       // Save to localStorage
-      this.saveToLocalStorage()
+      this.saveToLocalStorage();
+
+      // ADDITIONAL CODE FOR LIVE MODE
+      if (this.liveMode && this.isHost) {
+        this.syncToLocalStorage();
+      }
 
       // Reset input fields and marks
       this.participants.forEach(participant => {
-        this.currentScore[participant.name] = null
-        this.scoreMarks[participant.name] = null
-      })
+        this.currentScore[participant.name] = null;
+        this.scoreMarks[participant.name] = null;
+      });
     },
 
     markScorePositive(participantName) {
@@ -497,7 +745,21 @@ export default {
 
     saveToLocalStorage() {
       // Save the scores array to localStorage
-      localStorage.setItem('scoreTrackerData', JSON.stringify(this.scores))
+      localStorage.setItem('scoreTrackerData', JSON.stringify(this.scores));
+
+      // If in live mode and is host, also sync to the live room
+      if (this.liveMode && this.isHost) {
+        this.syncToLocalStorage();
+      }
+    },
+
+    checkForRoomInUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomId = urlParams.get('room');
+
+      if (roomId) {
+        this.joinLiveRoom(roomId);
+      }
     },
 
     resetData() {
@@ -853,6 +1115,201 @@ export default {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+.live-score-controls {
+  margin: 20px 0;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.create-room-btn,
+.stop-live-btn {
+  background-color: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 15px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.create-room-btn:hover {
+  background-color: #2563EB;
+}
+
+.stop-live-btn {
+  background-color: #EF4444;
+}
+
+.stop-live-btn:hover {
+  background-color: #DC2626;
+}
+
+.btn-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.live-mode-active {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #9CA3AF;
+  /* Default gray */
+}
+
+.status-indicator.connected {
+  background-color: #10B981;
+  /* Green */
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.connecting,
+.status-indicator.waiting {
+  background-color: #F59E0B;
+  /* Amber */
+  animation: pulse 1s infinite;
+}
+
+.status-indicator.failed,
+.status-indicator.error,
+.status-indicator.disconnected {
+  background-color: #EF4444;
+  /* Red */
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.last-update {
+  color: #6B7280;
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.share-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.watch-url-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: #F3F4F6;
+  color: #374151;
+}
+
+.copy-url-btn {
+  background-color: #6B7280;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy-url-btn:hover {
+  background-color: #4B5563;
+}
+
+.viewers-count {
+  font-size: 13px;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
+}
+
+.viewers-count::before {
+  content: '👁️';
+  margin-right: 5px;
+}
+
+.viewer-display {
+  background-color: #6a87ad;
+  border-left: 4px solid #3B82F6;
+  padding: 12px 15px;
+  margin: 15px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.status-text::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-text.connected::before {
+  background-color: #10B981;
+  animation: pulse 2s infinite;
+}
+
+.status-text.connecting::before,
+.status-text.waiting::before {
+  background-color: #F59E0B;
+  animation: pulse 1s infinite;
+}
+
+.status-text.failed::before,
+.status-text.error::before {
+  background-color: #EF4444;
+}
 
 .copyright {
   font-size: 14px;
@@ -1714,6 +2171,21 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .share-link {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .watch-url-input {
+    width: 100%;
+    margin: 5px 0;
+  }
+
+  .viewers-count {
+    margin-left: 0;
+    margin-top: 5px;
+  }
+
   .individual-charts {
     grid-template-columns: 1fr;
   }
