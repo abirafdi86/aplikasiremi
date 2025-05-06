@@ -26,9 +26,6 @@
             Update terakhir: {{ formatTime(lastUpdateTime) }}
           </span>
         </div>
-        <button @click="stopLiveMode" class="stop-live-btn small">
-          Kembali
-        </button>
       </div>
 
       <!-- Score Summary untuk Viewer -->
