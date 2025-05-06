@@ -17,7 +17,7 @@
             Menunggu data dari host...
           </span>
           <span v-else-if="connectionStatus === 'failed'" class="status-text failed">
-            Gagal terhubung ke room
+            Host telah meninggalkan room
           </span>
           <span v-else-if="connectionStatus === 'error'" class="status-text error">
             Error saat memuat data
@@ -28,8 +28,17 @@
         </div>
       </div>
 
+      <!-- Tampilan terima kasih ketika host telah meninggalkan room -->
+      <div v-if="connectionStatus === 'failed'" class="thank-you-container">
+        <div class="thank-you-message">
+          <h2>Terima Kasih Telah Menonton!</h2>
+          <p>Host telah mengakhiri sesi Live Score.</p>
+          <p>Semoga permainan berikutnya lebih menyenangkan!</p>
+        </div>
+      </div>
+
       <!-- Score Summary untuk Viewer -->
-      <div v-if="participants.length > 0" class="viewer-scores-summary">
+      <div v-if="participants.length > 0 && connectionStatus !== 'failed'" class="viewer-scores-summary">
         <div v-for="participant in participants" :key="participant.name" class="viewer-participant-total">
           <span class="participant-name">{{ participant.name }}:</span>
           <span class="participant-total-score" :style="{ color: getScoreColor(participant.name) }">
@@ -43,7 +52,7 @@
       </div>
 
       <!-- Charts untuk Viewer -->
-      <div v-if="participants.length > 0" class="viewer-charts">
+      <div v-if="participants.length > 0 && connectionStatus !== 'failed'" class="viewer-charts">
         <div v-for="(participant, index) in participants" :key="participant.name" class="viewer-chart-container">
           <h2 class="chart-title">{{ participant.name }}</h2>
           <div class="line-chart" :ref="`chart_${participant.name}`">
@@ -103,7 +112,7 @@
             <span>Link Tonton:</span>
             <input type="text" readonly :value="watchUrl" class="watch-url-input" />
             <button @click="copyWatchUrl" class="copy-url-btn">Salin</button>
-            <span v-if="viewers > 0" class="viewers-count">
+            <span class="viewers-count">
               {{ viewers }} penonton
             </span>
           </div>
@@ -247,6 +256,7 @@
   </div>
 </template>
 
+
 <script>
 import { ref, onMounted, onUnmounted } from 'vue';
 // Import Firebase Realtime Database
@@ -381,8 +391,19 @@ export default {
     },
 
     createLiveRoom() {
-      // Generate a unique room ID (timestamp + random string)
-      this.roomId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      // Check if there's a previously created room ID in localStorage
+      const existingRoomId = localStorage.getItem('scoreTrackerRoomId');
+
+      if (existingRoomId) {
+        // Use the existing room ID if available
+        this.roomId = existingRoomId;
+      } else {
+        // Generate a unique room ID (timestamp + random string)
+        this.roomId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        // Store it in localStorage for future use
+        localStorage.setItem('scoreTrackerRoomId', this.roomId);
+      }
+
       this.isHost = true;
       this.liveMode = true;
       this.connectionStatus = 'connected';
@@ -417,7 +438,16 @@ export default {
         // Set up listener for viewer count
         const viewersRef = dbRef(database, `rooms/${this.roomId}/viewers`);
         const viewersListener = onValue(viewersRef, (snapshot) => {
-          this.viewers = snapshot.val() || 0;
+          const data = snapshot.val();
+
+          // Check if data is an object (individual viewers) or a number
+          if (data && typeof data === 'object') {
+            // Count the number of keys in the object (each key represents a viewer)
+            this.viewers = Object.keys(data).length;
+          } else {
+            // If it's a number or null/undefined, use it directly
+            this.viewers = data || 0;
+          }
         });
 
         this.dbListeners.push({ ref: viewersRef, listener: viewersListener });
@@ -499,8 +529,6 @@ export default {
 
           if (!hostConnected) {
             this.connectionStatus = 'failed';
-            alert('Host telah meninggalkan room');
-            this.stopLiveMode();
           }
         });
 
@@ -617,6 +645,9 @@ export default {
         }).catch(error => {
           console.error('Error updating host status:', error);
         });
+
+        // Clear the stored room ID when explicitly stopping
+        localStorage.removeItem('scoreTrackerRoomId');
       }
 
       this.liveMode = false;
@@ -958,6 +989,16 @@ export default {
         // Clear localStorage
         localStorage.removeItem('scoreTrackerData')
         localStorage.removeItem('scoreTrackerParticipants')
+
+        // Also clear room ID if we're resetting everything
+        if (!this.liveMode || confirm('Apakah Anda juga ingin menghapus room live score saat ini?')) {
+          localStorage.removeItem('scoreTrackerRoomId')
+
+          // If in live mode, stop it
+          if (this.liveMode) {
+            this.stopLiveMode();
+          }
+        }
 
         // Reset participants and input fields
         this.participants = []
@@ -1309,6 +1350,16 @@ export default {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
+.thank-you-container {
+  text-align: center;
+  padding: 40px;
+  margin: 30px auto;
+  background-color: #b8bfc7;
+  border-radius: 10px;
+  max-width: 600px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .viewer-mode {
   max-width: 100%;
   padding: 10px;
@@ -1594,6 +1645,7 @@ export default {
 }
 
 .status-text {
+  color: white !important;
   font-size: 14px;
   font-weight: 500;
   display: flex;
