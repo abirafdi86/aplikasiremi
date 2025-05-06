@@ -187,6 +187,28 @@
 
 <script>
 import { ref, onMounted, onUnmounted } from 'vue';
+// Import Firebase Realtime Database
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref as dbRef, set, onValue, off, remove, update, onDisconnect } from "firebase/database";
+import { getAnalytics } from "firebase/analytics";
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyA_f9cxg8zVG-5qDPgy4RJdzGHjTjLx3AI",
+  authDomain: "aplikasi-remi.firebaseapp.com",
+  databaseURL: "https://aplikasi-remi-default-rtdb.firebaseio.com",
+  projectId: "aplikasi-remi",
+  storageBucket: "aplikasi-remi.firebasestorage.app",
+  messagingSenderId: "5127421335",
+  appId: "1:5127421335:web:b1027de89db3650e4558d2",
+  measurementId: "G-1TMTQ9PF6K"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const database = getDatabase(app);
+
 export default {
   data() {
     return {
@@ -209,8 +231,8 @@ export default {
       roomId: '',
       viewers: 0,
       lastUpdateTime: null,
-      syncInterval: null,
       connectionStatus: 'disconnected',
+      dbListeners: [], // Track database listeners
     }
   },
   computed: {
@@ -264,6 +286,10 @@ export default {
     // Check URL for room parameter
     this.checkForRoomInUrl();
   },
+  beforeUnmount() {
+    // Detach all Firebase listeners
+    this.detachAllListeners();
+  },
   methods: {
     formatTime(date) {
       if (!date) return '';
@@ -291,6 +317,7 @@ export default {
 
       alert('Link berhasil disalin ke clipboard!');
     },
+
     createLiveRoom() {
       // Generate a unique room ID (timestamp + random string)
       this.roomId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -298,26 +325,55 @@ export default {
       this.liveMode = true;
       this.connectionStatus = 'connected';
 
-      // Start syncing data to localStorage with the room prefix
-      this.syncToLocalStorage();
+      // Create room in Firebase
+      const roomRef = dbRef(database, `rooms/${this.roomId}`);
 
-      // Set up interval to keep syncing
-      this.syncInterval = setInterval(() => {
-        this.syncToLocalStorage();
-      }, 3000);
-
-      // Initialize viewers count
-      this.viewers = 0;
-
-      // Store room info in localStorage
-      localStorage.setItem(`skorLiveRoom_${this.roomId}_host`, JSON.stringify({
+      set(roomRef, {
         created: new Date().toISOString(),
-        lastActive: new Date().toISOString()
-      }));
+        lastActive: new Date().toISOString(),
+        host: true,
+        viewers: 0,
+        data: {
+          participants: this.participants,
+          scores: this.scores,
+          lastUpdate: new Date().toISOString()
+        }
+      }).then(() => {
+        console.log('Room created successfully');
 
-      // Show alert with watch URL
-      this.$nextTick(() => {
-        alert(`Room berhasil dibuat!\nBagikan link ini untuk ditonton: ${this.watchUrl}`);
+        // Set up presence system for host
+        const hostConnectionRef = dbRef(database, `rooms/${this.roomId}/hostConnected`);
+        const hostRef = dbRef(database, `rooms/${this.roomId}/host`);
+
+        // When host disconnects, update status
+        onDisconnect(hostConnectionRef).set(false);
+        onDisconnect(hostRef).set(false);
+
+        // Set the host as connected
+        set(hostConnectionRef, true);
+
+        // Set up listener for viewer count
+        const viewersRef = dbRef(database, `rooms/${this.roomId}/viewers`);
+        const viewersListener = onValue(viewersRef, (snapshot) => {
+          this.viewers = snapshot.val() || 0;
+        });
+
+        this.dbListeners.push({ ref: viewersRef, listener: viewersListener });
+
+        // Start syncing data periodically
+        this.syncInterval = setInterval(() => {
+          this.syncToFirebase();
+        }, 3000);
+
+        // Show alert with watch URL
+        this.$nextTick(() => {
+          alert(`Room berhasil dibuat!\nBagikan link ini untuk ditonton: ${this.watchUrl}`);
+        });
+      }).catch(error => {
+        console.error('Error creating room:', error);
+        this.connectionStatus = 'error';
+        alert('Gagal membuat room. Silakan coba lagi.');
+        this.stopLiveMode();
       });
     },
 
@@ -329,68 +385,95 @@ export default {
       this.liveMode = true;
       this.connectionStatus = 'connecting';
 
-      // Try to load data from localStorage with the room prefix
-      this.loadLiveData();
+      // Check if room exists in Firebase
+      const roomRef = dbRef(database, `rooms/${this.roomId}`);
 
-      // Set up interval to keep loading updates
-      this.syncInterval = setInterval(() => {
-        this.loadLiveData();
-      }, 2000);
+      onValue(roomRef, (snapshot) => {
+        const roomData = snapshot.val();
 
-      // Register as viewer
-      this.registerViewer();
+        if (!roomData) {
+          this.connectionStatus = 'failed';
+          console.error('Room not found');
+          return;
+        }
+
+        if (!roomData.host) {
+          this.connectionStatus = 'failed';
+          console.error('Host disconnected');
+          return;
+        }
+
+        // Register as viewer
+        this.registerViewer();
+
+        // Set up listener for data updates
+        const dataRef = dbRef(database, `rooms/${this.roomId}/data`);
+        const dataListener = onValue(dataRef, (dataSnapshot) => {
+          const data = dataSnapshot.val();
+
+          if (!data) {
+            this.connectionStatus = 'waiting';
+            return;
+          }
+
+          try {
+            // Update local data
+            this.participants = data.participants || [];
+            this.scores = data.scores || [];
+            this.lastUpdateTime = new Date(data.lastUpdate);
+            this.connectionStatus = 'connected';
+          } catch (e) {
+            console.error('Error parsing data:', e);
+            this.connectionStatus = 'error';
+          }
+        });
+
+        this.dbListeners.push({ ref: dataRef, listener: dataListener });
+
+        // Set up listener for host status
+        const hostRef = dbRef(database, `rooms/${this.roomId}/host`);
+        const hostListener = onValue(hostRef, (hostSnapshot) => {
+          const hostConnected = hostSnapshot.val();
+
+          if (!hostConnected) {
+            this.connectionStatus = 'failed';
+            alert('Host telah meninggalkan room');
+            this.stopLiveMode();
+          }
+        });
+
+        this.dbListeners.push({ ref: hostRef, listener: hostListener });
+      }, {
+        onlyOnce: true
+      }).catch(error => {
+        console.error('Error joining room:', error);
+        this.connectionStatus = 'error';
+        alert('Gagal terhubung ke room. Silakan coba lagi.');
+        this.stopLiveMode();
+      });
     },
 
-    syncToLocalStorage() {
+    syncToFirebase() {
       if (!this.roomId || !this.isHost) return;
 
-      // Update the data
-      const liveData = {
+      // Update the data in Firebase
+      const dataRef = dbRef(database, `rooms/${this.roomId}/data`);
+
+      update(dataRef, {
         participants: this.participants,
         scores: this.scores,
-        lastUpdate: new Date().toISOString(),
-        viewers: this.viewers
-      };
+        lastUpdate: new Date().toISOString()
+      }).then(() => {
+        // Update last active timestamp
+        const roomRef = dbRef(database, `rooms/${this.roomId}`);
+        update(roomRef, {
+          lastActive: new Date().toISOString()
+        });
 
-      localStorage.setItem(`skorLiveRoom_${this.roomId}_data`, JSON.stringify(liveData));
-      localStorage.setItem(`skorLiveRoom_${this.roomId}_host`, JSON.stringify({
-        created: new Date().toISOString(),
-        lastActive: new Date().toISOString()
-      }));
-
-      this.lastUpdateTime = new Date();
-    },
-
-    loadLiveData() {
-      if (!this.roomId || this.isHost) return;
-
-      // Check if room exists
-      const hostData = localStorage.getItem(`skorLiveRoom_${this.roomId}_host`);
-      if (!hostData) {
-        this.connectionStatus = 'failed';
-        return;
-      }
-
-      // Load data from localStorage
-      const liveDataStr = localStorage.getItem(`skorLiveRoom_${this.roomId}_data`);
-      if (!liveDataStr) {
-        this.connectionStatus = 'waiting';
-        return;
-      }
-
-      try {
-        const liveData = JSON.parse(liveDataStr);
-
-        // Update the local data
-        this.participants = liveData.participants;
-        this.scores = liveData.scores;
-        this.viewers = liveData.viewers;
-        this.lastUpdateTime = new Date(liveData.lastUpdate);
-        this.connectionStatus = 'connected';
-      } catch (e) {
-        console.error('Error parsing live data:', e);
-        this.connectionStatus = 'error';
-      }
+        this.lastUpdateTime = new Date();
+      }).catch(error => {
+        console.error('Error syncing data:', error);
+      });
     },
 
     registerViewer() {
@@ -399,51 +482,87 @@ export default {
       // Generate a viewer ID
       const viewerId = Math.random().toString(36).substr(2, 9);
 
-      // Store viewer info
-      localStorage.setItem(`skorLiveRoom_${this.roomId}_viewer_${viewerId}`, JSON.stringify({
+      // Register viewer in Firebase
+      const viewerRef = dbRef(database, `rooms/${this.roomId}/viewers/${viewerId}`);
+      const totalViewersRef = dbRef(database, `rooms/${this.roomId}/viewers`);
+
+      // Update viewer count
+      onValue(totalViewersRef, (snapshot) => {
+        let count = snapshot.val() || 0;
+
+        if (typeof count === 'object') {
+          // If viewers is an object (with viewer IDs), count the keys
+          count = Object.keys(count).length;
+        } else {
+          // If viewers is a number, increment it
+          count = count + 1;
+        }
+
+        set(totalViewersRef, count);
+      }, {
+        onlyOnce: true
+      });
+
+      // Set viewer data
+      set(viewerRef, {
         joined: new Date().toISOString(),
         lastActive: new Date().toISOString()
-      }));
+      });
 
-      // Update viewer count for host
-      const liveDataStr = localStorage.getItem(`skorLiveRoom_${this.roomId}_data`);
-      if (liveDataStr) {
-        try {
-          const liveData = JSON.parse(liveDataStr);
-          liveData.viewers = (liveData.viewers || 0) + 1;
-          localStorage.setItem(`skorLiveRoom_${this.roomId}_data`, JSON.stringify(liveData));
-        } catch (e) {
-          console.error('Error updating viewer count:', e);
-        }
-      }
+      // Clean up when viewer disconnects
+      onDisconnect(viewerRef).remove();
 
       // Set up interval to keep viewer active
-      setInterval(() => {
-        localStorage.setItem(`skorLiveRoom_${this.roomId}_viewer_${viewerId}`, JSON.stringify({
-          joined: new Date().toISOString(),
+      const keepAliveInterval = setInterval(() => {
+        update(viewerRef, {
           lastActive: new Date().toISOString()
-        }));
+        });
       }, 5000);
+
+      // Store interval to clear it when leaving
+      this.viewerKeepAliveInterval = keepAliveInterval;
     },
 
-    stopLiveMode() {
+    detachAllListeners() {
+      // Clean up all Firebase listeners
+      this.dbListeners.forEach(({ ref, listener }) => {
+        off(ref, listener);
+      });
+
+      this.dbListeners = [];
+
+      // Clear intervals
       if (this.syncInterval) {
         clearInterval(this.syncInterval);
         this.syncInterval = null;
       }
 
-      this.liveMode = false;
+      if (this.viewerKeepAliveInterval) {
+        clearInterval(this.viewerKeepAliveInterval);
+        this.viewerKeepAliveInterval = null;
+      }
+    },
 
-      if (this.isHost) {
-        // Remove room data
-        localStorage.removeItem(`skorLiveRoom_${this.roomId}_data`);
-        localStorage.removeItem(`skorLiveRoom_${this.roomId}_host`);
+    stopLiveMode() {
+      // Detach all Firebase listeners
+      this.detachAllListeners();
+
+      if (this.isHost && this.roomId) {
+        // Remove room data if host
+        const roomRef = dbRef(database, `rooms/${this.roomId}`);
+        update(roomRef, {
+          host: false
+        }).catch(error => {
+          console.error('Error updating host status:', error);
+        });
       }
 
+      this.liveMode = false;
       this.roomId = '';
       this.isHost = false;
       this.connectionStatus = 'disconnected';
     },
+
     calculateScoreDifference() {
       if (!this.lowestScoringParticipant || !this.secondLowestScoringParticipant) return 0;
 
@@ -559,8 +678,12 @@ export default {
 
       // Save participant names to localStorage
       this.saveParticipantsToLocalStorage()
-    },
 
+      // If in live mode and is host, sync to Firebase
+      if (this.liveMode && this.isHost) {
+        this.syncToFirebase();
+      }
+    },
 
     saveParticipantsToLocalStorage() {
       // Save participant names to localStorage
@@ -623,9 +746,9 @@ export default {
       // Save to localStorage
       this.saveToLocalStorage();
 
-      // ADDITIONAL CODE FOR LIVE MODE
+      // If in live mode and is host, sync to Firebase
       if (this.liveMode && this.isHost) {
-        this.syncToLocalStorage();
+        this.syncToFirebase();
       }
 
       // Reset input fields and marks
@@ -747,9 +870,9 @@ export default {
       // Save the scores array to localStorage
       localStorage.setItem('scoreTrackerData', JSON.stringify(this.scores));
 
-      // If in live mode and is host, also sync to the live room
+      // If in live mode and is host, also sync to Firebase
       if (this.liveMode && this.isHost) {
-        this.syncToLocalStorage();
+        this.syncToFirebase();
       }
     },
 
@@ -758,7 +881,10 @@ export default {
       const roomId = urlParams.get('room');
 
       if (roomId) {
-        this.joinLiveRoom(roomId);
+        // Set a short timeout to ensure Firebase is fully initialized
+        setTimeout(() => {
+          this.joinLiveRoom(roomId);
+        }, 1000);
       }
     },
 
@@ -776,6 +902,11 @@ export default {
         this.playerNameInputs = ['', '', '', '']
         this.currentScore = {}
         this.scoreMarks = {}
+
+        // If in live mode and is host, sync cleared data to Firebase
+        if (this.liveMode && this.isHost) {
+          this.syncToFirebase();
+        }
       }
     },
 
