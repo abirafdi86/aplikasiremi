@@ -238,6 +238,9 @@
 
         <!-- Action buttons section -->
         <div class="action-buttons">
+          <button @click="saveGameToHistory" class="save-history-btn">
+            Simpan ke Riwayat
+          </button>
           <button @click="downloadReport" class="download-btn">
             Download Laporan (JPG)
           </button>
@@ -252,9 +255,204 @@
         </div>
       </div>
     </div>
+
+    <div v-if="!liveMode || isHost" class="leaderboard-panel">
+      <div class="leaderboard-header">
+        <h2 class="leaderboard-title">Leaderboard Pemain</h2>
+        <button @click="toggleLeaderboardPanel" class="toggle-leaderboard-btn">
+          {{ showLeaderboardPanel ? 'Tutup' : 'Lihat Leaderboard' }}
+        </button>
+      </div>
+
+      <div v-if="showLeaderboardPanel" class="leaderboard-content">
+        <div v-if="!playerStats || Object.keys(playerStats).length === 0" class="no-leaderboard">
+          <p>Belum ada data statistik pemain.</p>
+        </div>
+
+        <div v-else>
+          <div class="leaderboard-filters">
+            <div class="filter-group">
+              <label for="sort-by">Urutkan berdasarkan:</label>
+              <select id="sort-by" v-model="leaderboardSortBy">
+                <option value="winRate">Persentase Menang</option>
+                <option value="totalGames">Total Permainan</option>
+                <option value="avgScore">Rata-rata Skor</option>
+                <option value="totalWins">Total Kemenangan</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="min-games">Minimal permainan:</label>
+              <select id="min-games" v-model="leaderboardMinGames">
+                <option value="0">Semua Pemain</option>
+                <option value="3">3+ Permainan</option>
+                <option value="5">5+ Permainan</option>
+                <option value="10">10+ Permainan</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="leaderboard-table-container">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Pemain</th>
+                  <th>Level</th>
+                  <th>Win Rate</th>
+                  <th>Total Permainan</th>
+                  <th>Menang</th>
+                  <th>Kalah</th>
+                  <th>Avg. Skor</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(player, index) in sortedLeaderboard" :key="player.name"
+                  :class="getLeaderboardRowClass(index)">
+                  <td class="rank-cell">#{{ index + 1 }}</td>
+                  <td class="player-name-cell">{{ player.name }}</td>
+                  <td class="player-level-cell">
+                    <span class="player-level" :class="'level-' + player.level.toLowerCase()">
+                      {{ player.level }}
+                    </span>
+                  </td>
+                  <td class="win-rate-cell">{{ formatPercent(player.winRate) }}</td>
+                  <td>{{ player.totalGames }}</td>
+                  <td>{{ player.wins }}</td>
+                  <td>{{ player.losses }}</td>
+                  <td>{{ formatNumber(player.avgScore) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="leaderboard-actions">
+              <button @click="resetPlayerStats" class="reset-stats-btn">
+                Reset Semua Statistik
+              </button>
+            </div>
+          </div>
+
+
+          <div class="level-explanation">
+            <h3>Klasifikasi Level Pemain:</h3>
+            <div class="level-grid">
+              <div class="level-item">
+                <span class="player-level level-newbie">Newbie</span>
+                <p>Pemain baru dengan pengalaman terbatas. Win rate &lt; 30% atau kurang dari 5 permainan.</p>
+              </div>
+              <div class="level-item">
+                <span class="player-level level-beginner">Beginner</span>
+                <p>Pemain dengan pemahaman dasar. Win rate 30-45% dan minimal 5 permainan.</p>
+              </div>
+              <div class="level-item">
+                <span class="player-level level-intermediate">Intermediate</span>
+                <p>Pemain dengan pengalaman sedang. Win rate 45-60% dan minimal 10 permainan.</p>
+              </div>
+              <div class="level-item">
+                <span class="player-level level-advanced">Advanced</span>
+                <p>Pemain berpengalaman dengan strategi baik. Win rate 60-75% dan minimal 15 permainan.</p>
+              </div>
+              <div class="level-item">
+                <span class="player-level level-pro">Pro</span>
+                <p>Pemain ahli dengan penguasaan permainan. Win rate &gt; 75% dan minimal 20 permainan.</p>
+              </div>
+              <div class="level-item">
+                <span class="player-level level-legend">Legend</span>
+                <p>Pemain legendaris. Win rate &gt; 85% dengan minimal 30 permainan.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="player-stats-detail" v-if="selectedPlayerStats">
+            <h3>Statistik Detail: {{ selectedPlayerStats.name }}</h3>
+            <!-- Detailed player stats can be added here in the future -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Panel - For host mode only -->
+    <div v-if="!liveMode || isHost" class="history-panel">
+      <div class="history-header">
+        <h2 class="history-title">Riwayat Permainan</h2>
+        <button @click="toggleHistoryPanel" class="toggle-history-btn">
+          {{ showHistoryPanel ? 'Tutup' : 'Lihat Riwayat' }}
+        </button>
+      </div>
+
+      <div v-if="showHistoryPanel" class="history-content">
+        <div v-if="gameHistory.length === 0" class="no-history">
+          <p>Belum ada riwayat permainan.</p>
+        </div>
+
+        <div v-else class="history-list">
+          <div v-for="(history, index) in gameHistory" :key="index" class="history-item">
+            <div class="history-item-header">
+              <span class="history-date">{{ formatHistoryDate(history.date) }}</span>
+              <div class="history-actions">
+                <button @click="loadGameHistory(index)" class="load-history-btn" title="Muat Permainan">
+                  <span>⏮️</span>
+                </button>
+                <button @click="deleteGameHistory(index)" class="delete-history-btn" title="Hapus">
+                  <span>🗑️</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="history-players">
+              <div v-for="player in history.participants" :key="player.name" class="history-player">
+                <span class="history-player-name">{{ player.name }}:</span>
+                <span class="history-player-score" :style="{ color: getScoreColorForHistory(player.name, history) }">
+                  {{ calculateHistoryTotalScore(player.name, history) }}
+                </span>
+              </div>
+            </div>
+
+            <div class="history-rounds">
+              <span class="history-rounds-count">{{ history.scores.length }} ronde</span>
+              <button @click="toggleHistoryDetails(index)" class="toggle-details-btn">
+                {{ expandedHistory === index ? 'Tutup Detail' : 'Lihat Detail' }}
+              </button>
+            </div>
+
+            <div v-if="expandedHistory === index" class="history-details">
+              <table class="history-scores-table">
+                <thead>
+                  <tr>
+                    <th>Ronde</th>
+                    <th v-for="player in history.participants" :key="player.name">{{ player.name }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(scoreSet, roundIndex) in history.scores" :key="roundIndex">
+                    <td>{{ roundIndex + 1 }}</td>
+                    <td v-for="player in history.participants" :key="player.name"
+                      :class="getScoreMarkClass(player.name, scoreSet)">
+                      {{ getPlayerScore(player.name, scoreSet) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div v-if="showConfirmDialog" class="confirm-dialog-overlay">
+      <div class="confirm-dialog">
+        <h3>{{ confirmDialogTitle }}</h3>
+        <p>{{ confirmDialogMessage }}</p>
+        <div class="confirm-dialog-buttons">
+          <button @click="confirmAction()" class="confirm-yes-btn">Ya</button>
+          <button @click="cancelAction()" class="confirm-no-btn">Tidak</button>
+        </div>
+      </div>
+    </div>
+
     <p class="copyright">© 2025 by Abi Rafdi</p>
   </div>
 </template>
+
 
 
 <script>
@@ -304,10 +502,61 @@ export default {
       viewers: 0,
       lastUpdateTime: null,
       connectionStatus: 'disconnected',
-      dbListeners: [], // Track database listeners
+      dbListeners: [], // Track database listeners,
+      gameHistory: [],
+      showHistoryPanel: false,
+      expandedHistory: null,
+
+      // Confirmation dialog
+      showConfirmDialog: false,
+      confirmDialogTitle: '',
+      confirmDialogMessage: '',
+      pendingAction: null,
+      pendingActionParams: null,
+      playerStats: {},
+      showLeaderboardPanel: false,
+      leaderboardSortBy: 'winRate',
+      leaderboardMinGames: '0',
+      selectedPlayerStats: null,
     }
   },
   computed: {
+    sortedLeaderboard() {
+      // Convert playerStats object to array for sorting
+      let players = Object.keys(this.playerStats).map(name => {
+        const stats = this.playerStats[name];
+        const level = this.calculatePlayerLevel(stats);
+
+        return {
+          name,
+          level,
+          totalGames: stats.totalGames,
+          wins: stats.wins,
+          losses: stats.totalGames - stats.wins,
+          winRate: stats.totalGames > 0 ? stats.wins / stats.totalGames : 0,
+          avgScore: stats.totalGames > 0 ? stats.totalScore / stats.totalGames : 0
+        };
+      });
+
+      // Filter by minimum games
+      const minGames = parseInt(this.leaderboardMinGames);
+      if (minGames > 0) {
+        players = players.filter(player => player.totalGames >= minGames);
+      }
+
+      // Sort by selected criterion
+      if (this.leaderboardSortBy === 'winRate') {
+        players.sort((a, b) => b.winRate - a.winRate);
+      } else if (this.leaderboardSortBy === 'totalGames') {
+        players.sort((a, b) => b.totalGames - a.totalGames);
+      } else if (this.leaderboardSortBy === 'avgScore') {
+        players.sort((a, b) => b.avgScore - a.avgScore);
+      } else if (this.leaderboardSortBy === 'totalWins') {
+        players.sort((a, b) => b.wins - a.wins);
+      }
+
+      return players;
+    },
     watchUrl() {
       if (!this.roomId) return '';
       return `${window.location.origin}${window.location.pathname}?room=${this.roomId}`;
@@ -355,6 +604,12 @@ export default {
     // Load saved data when component is created
     this.loadSavedState();
 
+    // Load history data
+    this.loadHistoryFromLocalStorage();
+
+    // Load player stats
+    this.loadPlayerStatsFromLocalStorage();
+
     // Check URL for room parameter
     this.checkForRoomInUrl();
   },
@@ -363,6 +618,402 @@ export default {
     this.detachAllListeners();
   },
   methods: {
+    saveGameToHistory() {
+      if (this.participants.length === 0 || this.scores.length === 0) {
+        return;
+      }
+
+      // Update player stats
+      this.updatePlayerStats();
+
+      const gameRecord = {
+        date: new Date().toISOString(),
+        participants: JSON.parse(JSON.stringify(this.participants)),
+        scores: JSON.parse(JSON.stringify(this.scores))
+      };
+
+      this.gameHistory.push(gameRecord);
+      this.saveHistoryToLocalStorage();
+
+      // Show notification
+      alert('Permainan telah disimpan ke riwayat!');
+    },
+
+    // Add this method to view detailed stats for a specific player
+    viewPlayerStats(playerName) {
+      if (this.playerStats[playerName]) {
+        this.selectedPlayerStats = {
+          name: playerName,
+          ...this.playerStats[playerName]
+        };
+      }
+    },
+
+    // Add Reset Stats button functionality
+    resetPlayerStats() {
+      if (confirm('Apakah Anda yakin ingin menghapus semua statistik pemain? Tindakan ini tidak dapat dibatalkan.')) {
+        this.playerStats = {};
+        this.savePlayerStatsToLocalStorage();
+        this.selectedPlayerStats = null;
+        alert('Statistik pemain telah direset.');
+      }
+    },
+
+    // Modify executeLoadGameHistory to not update stats when loading history
+    executeLoadGameHistory(index) {
+      const historyItem = this.gameHistory[index];
+
+      this.participants = JSON.parse(JSON.stringify(historyItem.participants));
+      this.scores = JSON.parse(JSON.stringify(historyItem.scores));
+
+      // Reset current input values
+      this.currentScore = {};
+      this.scoreMarks = {};
+      this.participants.forEach(participant => {
+        this.currentScore[participant.name] = null;
+        this.scoreMarks[participant.name] = null;
+      });
+
+      // Save to localStorage
+      this.saveParticipantsToLocalStorage();
+      this.saveToLocalStorage();
+
+      // If in live mode and is host, sync to Firebase
+      if (this.liveMode && this.isHost) {
+        this.syncToFirebase();
+      }
+
+      // Close history panel
+      this.showHistoryPanel = false;
+      this.expandedHistory = null;
+
+      // Show notification
+      alert('Permainan berhasil dimuat dari riwayat!');
+    },
+
+    toggleLeaderboardPanel() {
+      this.showLeaderboardPanel = !this.showLeaderboardPanel;
+    },
+
+    calculatePlayerLevel(stats) {
+      const { totalGames, wins } = stats;
+      const winRate = totalGames > 0 ? wins / totalGames : 0;
+
+      // Level classification based on win rate and experience
+      if (totalGames >= 30 && winRate > 0.85) {
+        return 'Legend';
+      } else if (totalGames >= 20 && winRate > 0.75) {
+        return 'Pro';
+      } else if (totalGames >= 15 && winRate > 0.60) {
+        return 'Advanced';
+      } else if (totalGames >= 10 && winRate > 0.45) {
+        return 'Intermediate';
+      } else if (totalGames >= 5 && winRate > 0.30) {
+        return 'Beginner';
+      } else {
+        return 'Newbie';
+      }
+    },
+
+    getLeaderboardRowClass(index) {
+      if (index === 0) return 'rank-first';
+      if (index === 1) return 'rank-second';
+      if (index === 2) return 'rank-third';
+      return '';
+    },
+
+    formatPercent(value) {
+      return (value * 100).toFixed(1) + '%';
+    },
+
+    formatNumber(value) {
+      return value.toFixed(1);
+    },
+
+    // Update player statistics after a game ends
+    updatePlayerStats() {
+      // If there are no participants or scores, don't update stats
+      if (!this.participants.length || !this.scores.length) return;
+
+      // Calculate the result of the game
+      const gameResults = this.participants.map(participant => ({
+        name: participant.name,
+        score: this.calculateTotalScore(participant.name),
+        position: 0 // Will be set below
+      }));
+
+      // Sort by score (highest to lowest) to determine positions
+      gameResults.sort((a, b) => b.score - a.score);
+
+      // Assign positions (1-based, with ties handled)
+      let currentPosition = 1;
+      let previousScore = null;
+
+      gameResults.forEach((result, index) => {
+        if (index > 0 && result.score < previousScore) {
+          currentPosition = index + 1;
+        }
+        result.position = currentPosition;
+        previousScore = result.score;
+      });
+
+      // Create playerStats if it doesn't exist
+      if (!this.playerStats) {
+        this.playerStats = {};
+      }
+
+      // Update stats for each player
+      gameResults.forEach(result => {
+        const playerName = result.name;
+        const isWinner = result.position === 1;
+
+        // Initialize player stats if they don't exist
+        if (!this.playerStats[playerName]) {
+          this.playerStats[playerName] = {
+            totalGames: 0,
+            wins: 0,
+            totalScore: 0,
+            bestScore: -Infinity,
+            worstScore: Infinity,
+            winningStreak: 0,
+            currentStreak: 0,
+            lastPlayed: null
+          };
+        }
+
+        const stats = this.playerStats[playerName];
+
+        // Update general stats
+        stats.totalGames += 1;
+        stats.totalScore += result.score;
+        stats.bestScore = Math.max(stats.bestScore, result.score);
+        stats.worstScore = Math.min(stats.worstScore, result.score);
+        stats.lastPlayed = new Date().toISOString();
+
+        // Update win stats
+        if (isWinner) {
+          stats.wins += 1;
+          stats.currentStreak += 1;
+          stats.winningStreak = Math.max(stats.winningStreak, stats.currentStreak);
+        } else {
+          stats.currentStreak = 0;
+        }
+      });
+
+      // Save updated stats to localStorage
+      this.savePlayerStatsToLocalStorage();
+    },
+
+    savePlayerStatsToLocalStorage() {
+      localStorage.setItem('scoreTrackerPlayerStats', JSON.stringify(this.playerStats));
+    },
+
+    loadPlayerStatsFromLocalStorage() {
+      const savedStats = localStorage.getItem('scoreTrackerPlayerStats');
+      if (savedStats) {
+        try {
+          this.playerStats = JSON.parse(savedStats);
+        } catch (e) {
+          console.error('Error parsing saved player stats:', e);
+          this.playerStats = {};
+        }
+      }
+    },
+
+
+    toggleHistoryPanel() {
+      this.showHistoryPanel = !this.showHistoryPanel;
+      if (!this.showHistoryPanel) {
+        this.expandedHistory = null;
+      }
+    },
+
+    toggleHistoryDetails(index) {
+      this.expandedHistory = this.expandedHistory === index ? null : index;
+    },
+
+    formatHistoryDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    },
+
+    calculateHistoryTotalScore(playerName, historyItem) {
+      return historyItem.scores.reduce((total, scoreSet) => {
+        const playerScore = scoreSet.find(s => s.name === playerName);
+        return total + (playerScore ? playerScore.score : 0);
+      }, 0);
+    },
+
+    getScoreColorForHistory(playerName, historyItem) {
+      // Get all player total scores in this history item
+      const playerScores = historyItem.participants.map(p => ({
+        name: p.name,
+        score: this.calculateHistoryTotalScore(p.name, historyItem)
+      }));
+
+      // Sort by score (highest to lowest)
+      const sortedScores = playerScores.sort((a, b) => b.score - a.score);
+
+      const highestPlayer = sortedScores[0]?.name;
+      const lowestPlayer = sortedScores[sortedScores.length - 1]?.name;
+      const secondLowestPlayer = sortedScores[sortedScores.length - 2]?.name;
+
+      if (playerName === highestPlayer) {
+        return '#10B981'; // Green for highest score
+      } else if (playerName === lowestPlayer) {
+        return '#EF4444'; // Red for lowest score
+      } else if (playerName === secondLowestPlayer) {
+        return '#FBBF24'; // Yellow for second lowest
+      } else {
+        return '#888888'; // Gray for others
+      }
+    },
+
+    getPlayerScore(playerName, scoreSet) {
+      const playerScore = scoreSet.find(s => s.name === playerName);
+      return playerScore ? playerScore.score : 0;
+    },
+
+    getScoreMarkClass(playerName, scoreSet) {
+      const playerScore = scoreSet.find(s => s.name === playerName);
+      if (!playerScore) return '';
+
+      if (playerScore.mark === 'positive') {
+        return 'score-positive';
+      } else if (playerScore.mark === 'negative') {
+        return 'score-negative';
+      }
+      return '';
+    },
+
+    saveGameToHistory() {
+      if (this.participants.length === 0 || this.scores.length === 0) {
+        return;
+      }
+
+      const gameRecord = {
+        date: new Date().toISOString(),
+        participants: JSON.parse(JSON.stringify(this.participants)),
+        scores: JSON.parse(JSON.stringify(this.scores))
+      };
+
+      this.gameHistory.push(gameRecord);
+      this.saveHistoryToLocalStorage();
+
+      // Show notification
+      alert('Permainan telah disimpan ke riwayat!');
+    },
+
+    loadGameHistory(index) {
+      if (index < 0 || index >= this.gameHistory.length) {
+        return;
+      }
+
+      // If there's current game data, confirm before loading
+      if (this.participants.length > 0 && this.scores.length > 0) {
+        this.showConfirmDialog = true;
+        this.confirmDialogTitle = 'Muat Permainan dari Riwayat';
+        this.confirmDialogMessage = 'Memuat permainan dari riwayat akan menggantikan data permainan saat ini. Lanjutkan?';
+        this.pendingAction = this.executeLoadGameHistory;
+        this.pendingActionParams = index;
+      } else {
+        this.executeLoadGameHistory(index);
+      }
+    },
+
+    executeLoadGameHistory(index) {
+      const historyItem = this.gameHistory[index];
+
+      this.participants = JSON.parse(JSON.stringify(historyItem.participants));
+      this.scores = JSON.parse(JSON.stringify(historyItem.scores));
+
+      // Reset current input values
+      this.currentScore = {};
+      this.scoreMarks = {};
+      this.participants.forEach(participant => {
+        this.currentScore[participant.name] = null;
+        this.scoreMarks[participant.name] = null;
+      });
+
+      // Save to localStorage
+      this.saveParticipantsToLocalStorage();
+      this.saveToLocalStorage();
+
+      // If in live mode and is host, sync to Firebase
+      if (this.liveMode && this.isHost) {
+        this.syncToFirebase();
+      }
+
+      // Close history panel
+      this.showHistoryPanel = false;
+      this.expandedHistory = null;
+
+      // Show notification
+      alert('Permainan berhasil dimuat dari riwayat!');
+    },
+
+    deleteGameHistory(index) {
+      this.showConfirmDialog = true;
+      this.confirmDialogTitle = 'Hapus Riwayat Permainan';
+      this.confirmDialogMessage = 'Apakah Anda yakin ingin menghapus riwayat permainan ini?';
+      this.pendingAction = this.executeDeleteGameHistory;
+      this.pendingActionParams = index;
+    },
+
+    executeDeleteGameHistory(index) {
+      if (index < 0 || index >= this.gameHistory.length) {
+        return;
+      }
+
+      this.gameHistory.splice(index, 1);
+      this.saveHistoryToLocalStorage();
+
+      // Reset expanded detail view if needed
+      if (this.expandedHistory === index) {
+        this.expandedHistory = null;
+      } else if (this.expandedHistory > index) {
+        this.expandedHistory--;
+      }
+    },
+
+    saveHistoryToLocalStorage() {
+      localStorage.setItem('scoreTrackerHistory', JSON.stringify(this.gameHistory));
+    },
+
+    loadHistoryFromLocalStorage() {
+      const savedHistory = localStorage.getItem('scoreTrackerHistory');
+      if (savedHistory) {
+        try {
+          this.gameHistory = JSON.parse(savedHistory);
+        } catch (e) {
+          console.error('Error parsing saved history:', e);
+          this.gameHistory = [];
+        }
+      }
+    },
+
+    // Confirmation dialog methods
+    confirmAction() {
+      if (this.pendingAction && typeof this.pendingAction === 'function') {
+        this.pendingAction(this.pendingActionParams);
+      }
+      this.showConfirmDialog = false;
+      this.pendingAction = null;
+      this.pendingActionParams = null;
+    },
+
+    cancelAction() {
+      this.showConfirmDialog = false;
+      this.pendingAction = null;
+      this.pendingActionParams = null;
+    },
+
     formatTime(date) {
       if (!date) return '';
 
@@ -634,6 +1285,16 @@ export default {
     },
 
     stopLiveMode() {
+      // Update player stats if there's data and we're the host
+      if (this.isHost && this.participants.length > 0 && this.scores.length > 0) {
+        this.updatePlayerStats();
+      }
+
+      // Save current game to history if there's data and we're the host
+      if (this.isHost && this.participants.length > 0 && this.scores.length > 0) {
+        this.saveGameToHistory();
+      }
+
       // Detach all Firebase listeners
       this.detachAllListeners();
 
@@ -983,6 +1644,16 @@ export default {
 
     resetData() {
       if (confirm('Apakah Anda yakin ingin menghapus semua data skor?')) {
+        // Update player stats if there's data
+        if (this.participants.length > 0 && this.scores.length > 0) {
+          this.updatePlayerStats();
+        }
+
+        // Save current game to history if there's data
+        if (this.participants.length > 0 && this.scores.length > 0) {
+          this.saveGameToHistory();
+        }
+
         // Clear scores array
         this.scores = []
 
@@ -1425,6 +2096,28 @@ export default {
   margin-top: 30px;
 }
 
+.leaderboard-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  padding: 1em;
+}
+
+.reset-stats-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.reset-stats-btn:hover {
+  background-color: #dc2626;
+}
+
 .viewer-chart-container {
   background-color: white;
   padding: 15px;
@@ -1661,6 +2354,273 @@ export default {
   margin-right: 8px;
 }
 
+/* Leaderboard Panel Styles */
+.leaderboard-panel {
+  margin-top: 2rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: #f9fafb;
+}
+
+.leaderboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.leaderboard-title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #374151;
+}
+
+.toggle-leaderboard-btn {
+  background-color: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggle-leaderboard-btn:hover {
+  background-color: #7c3aed;
+}
+
+.leaderboard-content {
+  padding: 1rem;
+}
+
+.no-leaderboard {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.leaderboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  background-color: #f3f4f6;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.filter-group select {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background-color: white;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.leaderboard-table-container {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+}
+
+.leaderboard-table {
+  color: black;
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  font-size: 0.875rem;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+  padding: 0.75rem;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.leaderboard-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+}
+
+.leaderboard-table tr:last-child td {
+  border-bottom: none;
+}
+
+.leaderboard-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.rank-cell {
+  font-weight: 600;
+}
+
+.player-name-cell {
+  font-weight: 500;
+  text-align: left;
+}
+
+.player-level-cell {
+  text-align: center;
+}
+
+.win-rate-cell {
+  font-weight: 500;
+}
+
+.player-level {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.level-newbie {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.level-beginner {
+  background-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.level-intermediate {
+  background-color: #a7f3d0;
+  color: #065f46;
+}
+
+.level-advanced {
+  background-color: #fde68a;
+  color: #92400e;
+}
+
+.level-pro {
+  background-color: #fed7aa;
+  color: #9a3412;
+}
+
+.level-legend {
+  background-color: #fbcfe8;
+  color: #831843;
+}
+
+.rank-first td {
+  background-color: rgba(255, 215, 0, 0.1);
+}
+
+.rank-second td {
+  background-color: rgba(192, 192, 192, 0.1);
+}
+
+.rank-third td {
+  background-color: rgba(205, 127, 50, 0.1);
+}
+
+.level-explanation {
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.level-explanation h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  color: #374151;
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.level-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.level-item .player-level {
+  align-self: flex-start;
+}
+
+.level-item p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .leaderboard-filters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-group select {
+    flex-grow: 1;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 0.5rem;
+  }
+
+  .level-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Manual game save button */
+.save-history-btn {
+  background-color: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.save-history-btn:hover {
+  background-color: #7c3aed;
+}
+
 .status-text.connected::before {
   background-color: #10B981;
   animation: pulse 2s infinite;
@@ -1810,6 +2770,264 @@ export default {
   position: relative;
   overflow: hidden;
   letter-spacing: 0.5px;
+}
+
+.history-panel {
+  margin-top: 2rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: #f9fafb;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.history-title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #374151;
+}
+
+.toggle-history-btn {
+  background-color: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggle-history-btn:hover {
+  background-color: #4f46e5;
+}
+
+.history-content {
+  padding: 1rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.no-history {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-item {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.history-date {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.history-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.load-history-btn,
+.delete-history-btn {
+  background-color: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.25rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.load-history-btn:hover {
+  background-color: #f3f4f6;
+}
+
+.delete-history-btn:hover {
+  background-color: #fee2e2;
+  border-color: #fecaca;
+}
+
+.history-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.history-player {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.history-player-name {
+  font-weight: 500;
+}
+
+.history-player-score {
+  font-weight: 600;
+}
+
+.history-rounds {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.history-rounds-count {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.toggle-details-btn {
+  background-color: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggle-details-btn:hover {
+  background-color: #f3f4f6;
+}
+
+.history-details {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.history-scores-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.history-scores-table th,
+.history-scores-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.history-scores-table th {
+  background-color: #f3f4f6;
+  font-weight: 500;
+}
+
+.history-scores-table tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.score-positive {
+  background-color: #10b981;
+  color: white;
+}
+
+.score-negative {
+  background-color: #ef4444;
+  color: white;
+}
+
+/* Confirmation Dialog */
+.confirm-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-dialog {
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.confirm-dialog h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  color: #111827;
+}
+
+.confirm-dialog p {
+  margin-bottom: 1.5rem;
+  color: #4b5563;
+}
+
+.confirm-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.confirm-yes-btn,
+.confirm-no-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.confirm-yes-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+}
+
+.confirm-yes-btn:hover {
+  background-color: #dc2626;
+}
+
+.confirm-no-btn {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.confirm-no-btn:hover {
+  background-color: #e5e7eb;
 }
 
 .reset-positions-btn:before {
@@ -2537,6 +3755,23 @@ export default {
 }
 
 @media (max-width: 768px) {
+
+  .history-item-header,
+  .history-rounds {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .history-actions {
+    align-self: flex-end;
+  }
+
+  .history-players {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
   .viewer-header {
     flex-direction: column;
     align-items: flex-start;
