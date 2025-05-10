@@ -101,7 +101,7 @@
         <div v-if="liveMode" class="live-mode-active">
           <div class="live-status">
             <span class="status-indicator" :class="connectionStatus"></span>
-            <span v-if="isHost">Host Mode</span>
+            <span v-if="isHost" style="color: #6B7280;">Host Mode</span>
             <span v-else>Viewer Mode</span>
             <span v-if="lastUpdateTime" class="last-update">
               Update terakhir: {{ formatTime(lastUpdateTime) }}
@@ -109,7 +109,7 @@
           </div>
 
           <div v-if="isHost" class="share-link">
-            <span>Link Tonton:</span>
+            <span style="color: #6B7280;">Link Tonton:</span>
             <input type="text" readonly :value="watchUrl" class="watch-url-input" />
             <button @click="copyWatchUrl" class="copy-url-btn">Salin</button>
             <span class="viewers-count">
@@ -2562,7 +2562,7 @@ export default {
   }
 
   .watch-url-input {
-    width: 100%;
+    width: 90%;
     margin: 5px 0;
   }
 
