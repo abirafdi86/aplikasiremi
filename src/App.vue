@@ -85,6 +85,94 @@
           </div>
         </div>
       </div>
+
+      <!-- Add this to the viewer-mode div, after the viewer-charts div -->
+      <div v-if="participants.length > 0 && connectionStatus !== 'failed'" class="viewer-leaderboard">
+        <h2 class="viewer-section-title">Leaderboard Pemain</h2>
+
+        <div v-if="!playerStats || Object.keys(playerStats).length === 0" class="no-leaderboard">
+          <p>Belum ada data statistik pemain.</p>
+        </div>
+
+        <div v-else class="viewer-leaderboard-content">
+          <div class="viewer-leaderboard-filters">
+            <div class="filter-group">
+              <label for="viewer-sort-by">Urutkan:</label>
+              <select id="viewer-sort-by" v-model="leaderboardSortBy">
+                <option value="winRate">Win Rate</option>
+                <option value="totalGames">Total Games</option>
+                <option value="avgScore">Avg. Skor</option>
+                <option value="totalWins">Total Menang</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="viewer-min-games">Min. games:</label>
+              <select id="viewer-min-games" v-model="leaderboardMinGames">
+                <option value="0">Semua</option>
+                <option value="3">3+</option>
+                <option value="5">5+</option>
+                <option value="10">10+</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="viewer-leaderboard-table-container">
+            <table class="viewer-leaderboard-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Pemain</th>
+                  <th>Level</th>
+                  <th>Win Rate</th>
+                  <th>Games</th>
+                  <th>W/L</th>
+                  <th>Avg</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(player, index) in sortedLeaderboard" :key="player.name"
+                  :class="getLeaderboardRowClass(index)">
+                  <td class="rank-cell">{{ index + 1 }}</td>
+                  <td class="player-name-cell">{{ player.name }}</td>
+                  <td class="player-level-cell">
+                    <span class="player-level" :class="'level-' + player.level.toLowerCase()">
+                      {{ player.level }}
+                    </span>
+                  </td>
+                  <td class="win-rate-cell">{{ formatPercent(player.winRate) }}</td>
+                  <td>{{ player.totalGames }}</td>
+                  <td>{{ player.wins }}/{{ player.losses }}</td>
+                  <td>{{ formatNumber(player.avgScore) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="viewer-level-legend">
+            <div class="level-legend-title">Level Pemain:</div>
+            <div class="level-legend-items">
+              <div class="level-legend-item">
+                <span class="player-level level-newbie">Newbie</span>
+              </div>
+              <div class="level-legend-item">
+                <span class="player-level level-beginner">Beginner</span>
+              </div>
+              <div class="level-legend-item">
+                <span class="player-level level-intermediate">Inter</span>
+              </div>
+              <div class="level-legend-item">
+                <span class="player-level level-advanced">Adv</span>
+              </div>
+              <div class="level-legend-item">
+                <span class="player-level level-pro">Pro</span>
+              </div>
+              <div class="level-legend-item">
+                <span class="player-level level-legend">Legend</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Tampilan Host/Admin Mode -->
@@ -1164,6 +1252,12 @@ export default {
             this.participants = data.participants || [];
             this.scores = data.scores || [];
             this.lastUpdateTime = new Date(data.lastUpdate);
+
+            // Add this - Update player stats if provided by host
+            if (data.playerStats) {
+              this.playerStats = data.playerStats;
+            }
+
             this.connectionStatus = 'connected';
           } catch (e) {
             console.error('Error parsing data:', e);
@@ -1203,6 +1297,7 @@ export default {
       update(dataRef, {
         participants: this.participants,
         scores: this.scores,
+        playerStats: this.playerStats, // Add this line to sync player stats
         lastUpdate: new Date().toISOString()
       }).then(() => {
         // Update last active timestamp
@@ -2031,6 +2126,126 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.viewer-leaderboard {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.viewer-section-title {
+  font-size: 1.25rem;
+  color: #374151;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.viewer-leaderboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.viewer-leaderboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #f3f4f6;
+  border-radius: 0.375rem;
+  justify-content: center;
+}
+
+.viewer-leaderboard-filters .filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.viewer-leaderboard-filters label {
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.viewer-leaderboard-filters select {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background-color: white;
+  font-size: 0.75rem;
+  color: #374151;
+}
+
+.viewer-leaderboard-table-container {
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 0.375rem;
+  background-color: white;
+}
+
+.viewer-leaderboard-table {
+  color: black;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.viewer-leaderboard-table th,
+.viewer-leaderboard-table td {
+  padding: 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.viewer-leaderboard-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+}
+
+.viewer-leaderboard-table tr:last-child td {
+  border-bottom: none;
+}
+
+.viewer-leaderboard-table .player-name-cell {
+  text-align: left;
+}
+
+.viewer-level-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem;
+  background-color: white;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.level-legend-title {
+  font-size: 0.75rem;
+  color: #4b5563;
+  margin-right: 0.5rem;
+}
+
+.level-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.level-legend-item .player-level {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.35rem;
+}
+
 .viewer-mode {
   max-width: 100%;
   padding: 10px;
@@ -2582,6 +2797,26 @@ export default {
 
 /* Responsive styles */
 @media (max-width: 768px) {
+  .viewer-leaderboard-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .viewer-leaderboard-filters .filter-group {
+    justify-content: space-between;
+  }
+
+  .viewer-leaderboard-table th,
+  .viewer-leaderboard-table td {
+    padding: 0.35rem 0.25rem;
+    font-size: 0.7rem;
+  }
+
+  .level-legend-items {
+    justify-content: center;
+  }
+
   .leaderboard-filters {
     flex-direction: column;
     align-items: flex-start;
@@ -2931,6 +3166,7 @@ export default {
 }
 
 .history-scores-table {
+  color: black;
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
