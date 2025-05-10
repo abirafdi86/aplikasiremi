@@ -98,76 +98,95 @@
           <div class="viewer-leaderboard-filters">
             <div class="filter-group">
               <label for="viewer-sort-by">Urutkan:</label>
-              <select id="viewer-sort-by" v-model="leaderboardSortBy">
+              <select id="sort-by" v-model="leaderboardSortBy">
                 <option value="winRate">Win Rate</option>
-                <option value="totalGames">Total Games</option>
-                <option value="avgScore">Avg. Skor</option>
-                <option value="totalWins">Total Menang</option>
+                <option value="lossRate">Loss Rate (Terendah)</option>
+                <option value="wins">Ronde Menang</option>
+                <option value="totalRounds">Total Ronde</option>
+                <option value="avgScore">Rata-rata Skor</option>
+                <option value="positiveImpact">Impact (+/-)</option>
+                <option value="winStreak">Win Streak</option>
               </select>
             </div>
             <div class="filter-group">
-              <label for="viewer-min-games">Min. games:</label>
-              <select id="viewer-min-games" v-model="leaderboardMinGames">
+              <label for="min-games">Minimal ronde:</label>
+              <select id="min-games" v-model="leaderboardMinGames">
                 <option value="0">Semua</option>
-                <option value="3">3+</option>
-                <option value="5">5+</option>
-                <option value="10">10+</option>
+                <option value="5">5+ Ronde</option>
+                <option value="10">10+ Ronde</option>
+                <option value="20">20+ Ronde</option>
+                <option value="30">30+ Ronde</option>
               </select>
             </div>
           </div>
 
-          <div class="viewer-leaderboard-table-container">
-            <table class="viewer-leaderboard-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Pemain</th>
-                  <th>Level</th>
-                  <th>Win Rate</th>
-                  <th>Games</th>
-                  <th>W/L</th>
-                  <th>Avg</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(player, index) in sortedLeaderboard" :key="player.name"
-                  :class="getLeaderboardRowClass(index)">
-                  <td class="rank-cell">{{ index + 1 }}</td>
-                  <td class="player-name-cell">{{ player.name }}</td>
-                  <td class="player-level-cell">
-                    <span class="player-level" :class="'level-' + player.level.toLowerCase()">
-                      {{ player.level }}
-                    </span>
-                  </td>
-                  <td class="win-rate-cell">{{ formatPercent(player.winRate) }}</td>
-                  <td>{{ player.totalGames }}</td>
-                  <td>{{ player.wins }}/{{ player.losses }}</td>
-                  <td>{{ formatNumber(player.avgScore) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <table class="viewer-leaderboard-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Pemain</th>
+                <th>Level</th>
+                <th data-tooltip="Persentase ronde dengan skor tertinggi">Win%</th>
+                <th data-tooltip="Persentase ronde dengan skor terendah">Loss%</th>
+                <th>Ronde</th>
+                <th data-tooltip="Tertinggi/Tengah/Terendah">W/M/L</th>
+                <th data-tooltip="Streak kemenangan terbaik">Streak</th>
+                <th data-tooltip="Selisih ronde positif dan negatif">+/-</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(player, index) in sortedLeaderboard" :key="player.name"
+                :class="getLeaderboardRowClass(index)">
+                <td class="rank-cell">{{ index + 1 }}</td>
+                <td class="player-name-cell">{{ player.name }}</td>
+                <td class="player-level-cell">
+                  <span class="player-level" :class="'level-' + player.level.toLowerCase()">
+                    {{ player.level }}
+                  </span>
+                </td>
+                <td class="win-rate-cell">{{ formatPercent(player.winRate) }}</td>
+                <td class="loss-rate-cell">{{ formatPercent(player.lossRate) }}</td>
+                <td>{{ player.totalRounds }}</td>
+                <td>
+                  <span class="win-count">{{ player.wins }}</span>/
+                  <span class="middle-count">{{ player.middle }}</span>/
+                  <span class="loss-count">{{ player.losses }}</span>
+                </td>
+                <td class="win-streak-cell">{{ player.winStreak }}</td>
+                <td
+                  :class="{ 'positive-impact': player.positiveImpact > 0, 'negative-impact': player.positiveImpact < 0 }">
+                  {{ player.positiveImpact > 0 ? '+' : '' }}{{ player.positiveImpact }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-          <div class="viewer-level-legend">
-            <div class="level-legend-title">Level Pemain:</div>
-            <div class="level-legend-items">
-              <div class="level-legend-item">
+          <div class="level-explanation">
+            <h3>Klasifikasi Level Pemain:</h3>
+            <div class="level-grid">
+              <div class="level-item">
                 <span class="player-level level-newbie">Newbie</span>
+                <p>Pemain baru dengan pengalaman terbatas. Win rate &lt; 15% atau kurang dari 10 ronde.</p>
               </div>
-              <div class="level-legend-item">
+              <div class="level-item">
                 <span class="player-level level-beginner">Beginner</span>
+                <p>Pemain dengan pemahaman dasar. Win rate &gt; 15% dan minimal 10 ronde.</p>
               </div>
-              <div class="level-legend-item">
-                <span class="player-level level-intermediate">Inter</span>
+              <div class="level-item">
+                <span class="player-level level-intermediate">Intermediate</span>
+                <p>Pemain dengan pengalaman sedang. Win rate &gt; 20% dan minimal 20 ronde.</p>
               </div>
-              <div class="level-legend-item">
-                <span class="player-level level-advanced">Adv</span>
+              <div class="level-item">
+                <span class="player-level level-advanced">Advanced</span>
+                <p>Pemain berpengalaman dengan strategi baik. Win rate &gt; 25% dan minimal 30 ronde.</p>
               </div>
-              <div class="level-legend-item">
+              <div class="level-item">
                 <span class="player-level level-pro">Pro</span>
+                <p>Pemain ahli dengan penguasaan permainan. Win rate &gt; 30% dan minimal 40 ronde.</p>
               </div>
-              <div class="level-legend-item">
+              <div class="level-item">
                 <span class="player-level level-legend">Legend</span>
+                <p>Pemain legendaris. Win rate &gt; 35% dengan minimal 50 ronde dan skor positif &gt; 15.</p>
               </div>
             </div>
           </div>
@@ -362,10 +381,13 @@
             <div class="filter-group">
               <label for="sort-by">Urutkan berdasarkan:</label>
               <select id="sort-by" v-model="leaderboardSortBy">
-                <option value="winRate">Persentase Menang</option>
-                <option value="totalGames">Total Permainan</option>
+                <option value="winRate">Win Rate</option>
+                <option value="lossRate">Loss Rate (Terendah)</option>
+                <option value="wins">Ronde Menang</option>
+                <option value="totalRounds">Total Ronde</option>
                 <option value="avgScore">Rata-rata Skor</option>
-                <option value="totalWins">Total Kemenangan</option>
+                <option value="positiveImpact">Impact (+/-)</option>
+                <option value="winStreak">Win Streak</option>
               </select>
             </div>
             <div class="filter-group">
@@ -383,14 +405,17 @@
             <table class="leaderboard-table">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th>Pemain</th>
-                  <th>Level</th>
-                  <th>Win Rate</th>
-                  <th>Total Permainan</th>
-                  <th>Menang</th>
-                  <th>Kalah</th>
-                  <th>Avg. Skor</th>
+                  <th data-tooltip="Peringkat pemain">Rank</th>
+                  <th data-tooltip="Nama pemain">Pemain</th>
+                  <th data-tooltip="Level pemain berdasarkan performa">Level</th>
+                  <th data-tooltip="Persentase ronde dengan skor tertinggi">Win Rate</th>
+                  <th data-tooltip="Persentase ronde dengan skor terendah">Loss Rate</th>
+                  <th data-tooltip="Jumlah total ronde yang dimainkan">Ronde</th>
+                  <th data-tooltip="Ronde dengan skor tertinggi / skor tengah / skor terendah">W/M/L</th>
+                  <th data-tooltip="Streak kemenangan terbaik">Win Streak</th>
+                  <th data-tooltip="Streak kekalahan terburuk">Loss Streak</th>
+                  <th data-tooltip="Rata-rata skor per ronde">Avg. Skor</th>
+                  <th data-tooltip="Selisih ronde positif dan negatif">+/-</th>
                 </tr>
               </thead>
               <tbody>
@@ -404,18 +429,23 @@
                     </span>
                   </td>
                   <td class="win-rate-cell">{{ formatPercent(player.winRate) }}</td>
-                  <td>{{ player.totalGames }}</td>
-                  <td>{{ player.wins }}</td>
-                  <td>{{ player.losses }}</td>
+                  <td class="loss-rate-cell">{{ formatPercent(player.lossRate) }}</td>
+                  <td>{{ player.totalRounds }}</td>
+                  <td>
+                    <span class="win-count">{{ player.wins }}</span> /
+                    <span class="middle-count">{{ player.middle }}</span> /
+                    <span class="loss-count">{{ player.losses }}</span>
+                  </td>
+                  <td class="win-streak-cell">{{ player.winStreak }}</td>
+                  <td class="loss-streak-cell">{{ player.lossStreak }}</td>
                   <td>{{ formatNumber(player.avgScore) }}</td>
+                  <td
+                    :class="{ 'positive-impact': player.positiveImpact > 0, 'negative-impact': player.positiveImpact < 0 }">
+                    {{ player.positiveImpact > 0 ? '+' : '' }}{{ player.positiveImpact }}
+                  </td>
                 </tr>
               </tbody>
             </table>
-            <div class="leaderboard-actions">
-              <button @click="resetPlayerStats" class="reset-stats-btn">
-                Reset Semua Statistik
-              </button>
-            </div>
           </div>
 
 
@@ -424,27 +454,31 @@
             <div class="level-grid">
               <div class="level-item">
                 <span class="player-level level-newbie">Newbie</span>
-                <p>Pemain baru dengan pengalaman terbatas. Win rate &lt; 30% atau kurang dari 5 permainan.</p>
+                <p>Pemain baru dengan pengalaman terbatas. Memainkan kurang dari 10 ronde atau memiliki performa rendah.
+                </p>
               </div>
               <div class="level-item">
                 <span class="player-level level-beginner">Beginner</span>
-                <p>Pemain dengan pemahaman dasar. Win rate 30-45% dan minimal 5 permainan.</p>
+                <p>Pemain dengan pemahaman dasar. Memainkan minimal 10 ronde dan tidak terlalu sering mendapatkan skor
+                  terendah.</p>
               </div>
               <div class="level-item">
                 <span class="player-level level-intermediate">Intermediate</span>
-                <p>Pemain dengan pengalaman sedang. Win rate 45-60% dan minimal 10 permainan.</p>
+                <p>Pemain dengan pengalaman sedang. Memainkan minimal 20 ronde dan sering mendapatkan skor tinggi.</p>
               </div>
               <div class="level-item">
                 <span class="player-level level-advanced">Advanced</span>
-                <p>Pemain berpengalaman dengan strategi baik. Win rate 60-75% dan minimal 15 permainan.</p>
+                <p>Pemain berpengalaman dengan strategi baik. Memainkan minimal 30 ronde dan lebih sering mendapat skor
+                  tertinggi.</p>
               </div>
               <div class="level-item">
                 <span class="player-level level-pro">Pro</span>
-                <p>Pemain ahli dengan penguasaan permainan. Win rate &gt; 75% dan minimal 20 permainan.</p>
+                <p>Pemain ahli dengan strategi hebat. Memainkan minimal 40 ronde dan jarang mendapat skor terendah.</p>
               </div>
               <div class="level-item">
                 <span class="player-level level-legend">Legend</span>
-                <p>Pemain legendaris. Win rate &gt; 85% dengan minimal 30 permainan.</p>
+                <p>Pemain legendaris. Memainkan minimal 50 ronde dengan win rate tinggi dan impact positif yang besar.
+                </p>
               </div>
             </div>
           </div>
@@ -537,6 +571,8 @@
       </div>
     </div>
 
+
+
     <p class="copyright">© 2025 by Abi Rafdi</p>
   </div>
 </template>
@@ -594,6 +630,17 @@ export default {
       gameHistory: [],
       showHistoryPanel: false,
       expandedHistory: null,
+      hasCustomDialog: false,
+      dialogConfig: {
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info', // 'info', 'success', 'error', 'warning'
+        confirmLabel: 'OK',
+        cancelLabel: 'Batal',
+        onConfirm: null,
+        onCancel: null
+      },
 
       // Confirmation dialog
       showConfirmDialog: false,
@@ -608,39 +655,79 @@ export default {
       selectedPlayerStats: null,
     }
   },
+  mounted() {
+    // Add event listeners for tooltips when the component is mounted
+    window.addEventListener('scroll', () => {
+      // Re-add tooltips after scrolling (for fixed headers)
+      if (this.showLeaderboardPanel) {
+        this.addColumnTooltips();
+      }
+    });
+
+    // Listen for leaderboard updates
+    this.$watch('playerStats', () => {
+      if (this.showLeaderboardPanel) {
+        this.$nextTick(() => {
+          this.addLevelTooltips();
+          this.addColumnTooltips();
+        });
+      }
+    });
+  },
   computed: {
     sortedLeaderboard() {
-      // Convert playerStats object to array for sorting
+      // Konversi objek playerStats ke array untuk pengurutan
       let players = Object.keys(this.playerStats).map(name => {
         const stats = this.playerStats[name];
         const level = this.calculatePlayerLevel(stats);
 
+        // Hitung metrik berdasarkan ronde
+        const winRate = stats.totalRounds > 0 ? stats.highestScoreRounds / stats.totalRounds : 0;
+        const lossRate = stats.totalRounds > 0 ? stats.lowestScoreRounds / stats.totalRounds : 0;
+        const avgScore = stats.totalRounds > 0 ? stats.totalScore / stats.totalRounds : 0;
+        const positiveImpact = stats.positiveRounds - stats.negativeRounds;
+
         return {
           name,
           level,
-          totalGames: stats.totalGames,
-          wins: stats.wins,
-          losses: stats.totalGames - stats.wins,
-          winRate: stats.totalGames > 0 ? stats.wins / stats.totalGames : 0,
-          avgScore: stats.totalGames > 0 ? stats.totalScore / stats.totalGames : 0
+          totalRounds: stats.totalRounds,
+          wins: stats.highestScoreRounds,
+          losses: stats.lowestScoreRounds,
+          middle: stats.middleRounds,
+          winRate,
+          lossRate,
+          avgScore,
+          winStreak: stats.winStreak,
+          lossStreak: stats.lossStreak,
+          positiveRounds: stats.positiveRounds,
+          negativeRounds: stats.negativeRounds,
+          positiveImpact,
+          bestScore: stats.bestScore === -Infinity ? 0 : stats.bestScore,
+          worstScore: stats.worstScore === Infinity ? 0 : stats.worstScore
         };
       });
 
-      // Filter by minimum games
-      const minGames = parseInt(this.leaderboardMinGames);
-      if (minGames > 0) {
-        players = players.filter(player => player.totalGames >= minGames);
+      // Filter berdasarkan minimal ronde
+      const minRounds = parseInt(this.leaderboardMinGames);
+      if (minRounds > 0) {
+        players = players.filter(player => player.totalRounds >= minRounds);
       }
 
-      // Sort by selected criterion
+      // Urutkan berdasarkan kriteria yang dipilih
       if (this.leaderboardSortBy === 'winRate') {
         players.sort((a, b) => b.winRate - a.winRate);
-      } else if (this.leaderboardSortBy === 'totalGames') {
-        players.sort((a, b) => b.totalGames - a.totalGames);
+      } else if (this.leaderboardSortBy === 'totalRounds') {
+        players.sort((a, b) => b.totalRounds - a.totalRounds);
+      } else if (this.leaderboardSortBy === 'wins') {
+        players.sort((a, b) => b.wins - a.wins);
       } else if (this.leaderboardSortBy === 'avgScore') {
         players.sort((a, b) => b.avgScore - a.avgScore);
-      } else if (this.leaderboardSortBy === 'totalWins') {
-        players.sort((a, b) => b.wins - a.wins);
+      } else if (this.leaderboardSortBy === 'positiveImpact') {
+        players.sort((a, b) => b.positiveImpact - a.positiveImpact);
+      } else if (this.leaderboardSortBy === 'winStreak') {
+        players.sort((a, b) => b.winStreak - a.winStreak);
+      } else if (this.leaderboardSortBy === 'lossRate') {
+        players.sort((a, b) => a.lossRate - b.lossRate); // Urutkan dari terendah ke tertinggi untuk loss rate
       }
 
       return players;
@@ -706,6 +793,98 @@ export default {
     this.detachAllListeners();
   },
   methods: {
+    showDialog(config) {
+      this.dialogConfig = {
+        ...this.dialogConfig,
+        ...config,
+        visible: true
+      };
+    },
+
+    // Metode untuk menutup dialog kustom
+    closeDialog() {
+      this.dialogConfig.visible = false;
+    },
+
+    // Helper untuk dialog error
+    showErrorDialog(title, message) {
+      this.showDialog({
+        title,
+        message,
+        type: 'error',
+        confirmLabel: 'OK',
+        onConfirm: () => this.closeDialog(),
+        cancelLabel: null
+      });
+    },
+
+    // Helper untuk dialog sukses
+    showSuccessDialog(title, message) {
+      this.showDialog({
+        title,
+        message,
+        type: 'success',
+        confirmLabel: 'OK',
+        onConfirm: () => this.closeDialog(),
+        cancelLabel: null
+      });
+    },
+    addLevelTooltips() {
+      // Define tooltips for each level
+      const levelTooltips = {
+        'newbie': 'Pemain baru dengan pengalaman terbatas',
+        'beginner': 'Pemain dengan pemahaman dasar permainan',
+        'intermediate': 'Pemain dengan pengalaman sedang',
+        'advanced': 'Pemain berpengalaman dengan strategi baik',
+        'pro': 'Pemain ahli dengan penguasaan permainan',
+        'legend': 'Pemain legendaris dengan performa luar biasa'
+      };
+
+      // Get all level badges
+      setTimeout(() => {
+        const levelBadges = document.querySelectorAll('.player-level');
+        levelBadges.forEach(badge => {
+          const levelClass = Array.from(badge.classList)
+            .find(cls => cls.startsWith('level-'));
+
+          if (levelClass) {
+            const level = levelClass.replace('level-', '');
+            if (levelTooltips[level]) {
+              badge.setAttribute('data-tooltip', levelTooltips[level]);
+            }
+          }
+        });
+      }, 100);
+    },
+
+    // Add tooltips to column headers
+    addColumnTooltips() {
+      setTimeout(() => {
+        // Define tooltips for table headers
+        const headerTooltips = {
+          'Win Rate': 'Persentase ronde yang dimenangkan',
+          'Win%': 'Persentase ronde yang dimenangkan',
+          'Total Ronde': 'Jumlah total ronde yang telah dimainkan',
+          'Ronde': 'Jumlah total ronde yang telah dimainkan',
+          'Menang': 'Jumlah ronde yang dimenangkan',
+          'Seri': 'Jumlah ronde yang seri (berbagi tempat pertama)',
+          'Kalah': 'Jumlah ronde yang kalah',
+          'W/T/L': 'Menang/Seri/Kalah',
+          'Avg. Skor': 'Rata-rata skor per ronde',
+          'Streak': 'Jumlah kemenangan berturut-turut terbaik',
+          '+/-': 'Impact positif/negatif (ronde positif - ronde negatif)'
+        };
+
+        // Get all table headers
+        const headers = document.querySelectorAll('.leaderboard-table th, .viewer-leaderboard-table th');
+        headers.forEach(header => {
+          const text = header.textContent.trim();
+          if (headerTooltips[text]) {
+            header.setAttribute('data-tooltip', headerTooltips[text]);
+          }
+        });
+      }, 100);
+    },
     saveGameToHistory() {
       if (this.participants.length === 0 || this.scores.length === 0) {
         return;
@@ -747,6 +926,18 @@ export default {
       }
     },
 
+    toggleLeaderboardPanel() {
+      this.showLeaderboardPanel = !this.showLeaderboardPanel;
+
+      if (this.showLeaderboardPanel) {
+        // Add tooltips when panel is opened
+        this.$nextTick(() => {
+          this.addLevelTooltips();
+          this.addColumnTooltips();
+        });
+      }
+    },
+
     // Modify executeLoadGameHistory to not update stats when loading history
     executeLoadGameHistory(index) {
       const historyItem = this.gameHistory[index];
@@ -779,24 +970,38 @@ export default {
       alert('Permainan berhasil dimuat dari riwayat!');
     },
 
-    toggleLeaderboardPanel() {
-      this.showLeaderboardPanel = !this.showLeaderboardPanel;
-    },
-
     calculatePlayerLevel(stats) {
-      const { totalGames, wins } = stats;
-      const winRate = totalGames > 0 ? wins / totalGames : 0;
+      const {
+        totalRounds,
+        highestScoreRounds,
+        lowestScoreRounds,
+        positiveRounds,
+        negativeRounds,
+        winStreak
+      } = stats;
 
-      // Level classification based on win rate and experience
-      if (totalGames >= 30 && winRate > 0.85) {
+      // Hitung win rate (persentase ronde dengan skor tertinggi)
+      const winRate = totalRounds > 0 ? highestScoreRounds / totalRounds : 0;
+
+      // Hitung loss rate (persentase ronde dengan skor terendah)
+      const lossRate = totalRounds > 0 ? lowestScoreRounds / totalRounds : 0;
+
+      // Hitung dampak positif (selisih antara ronde positif dan negatif)
+      const positiveImpact = positiveRounds - negativeRounds;
+
+      // Hitung performa (score) pemain
+      const performanceScore = (winRate * 100) - (lossRate * 50) + (positiveImpact * 2) + (winStreak * 3);
+
+      // Tentukan level berdasarkan jumlah ronde dan performa
+      if (totalRounds >= 50 && performanceScore >= 60) {
         return 'Legend';
-      } else if (totalGames >= 20 && winRate > 0.75) {
+      } else if (totalRounds >= 40 && performanceScore >= 45) {
         return 'Pro';
-      } else if (totalGames >= 15 && winRate > 0.60) {
+      } else if (totalRounds >= 30 && performanceScore >= 30) {
         return 'Advanced';
-      } else if (totalGames >= 10 && winRate > 0.45) {
+      } else if (totalRounds >= 20 && performanceScore >= 15) {
         return 'Intermediate';
-      } else if (totalGames >= 5 && winRate > 0.30) {
+      } else if (totalRounds >= 10 && performanceScore >= 0) {
         return 'Beginner';
       } else {
         return 'Newbie';
@@ -814,83 +1019,104 @@ export default {
       return (value * 100).toFixed(1) + '%';
     },
 
+    // Metode untuk memformat angka
     formatNumber(value) {
       return value.toFixed(1);
     },
 
     // Update player statistics after a game ends
     updatePlayerStats() {
-      // If there are no participants or scores, don't update stats
+      // Jika tidak ada peserta atau skor, jangan update statistik
       if (!this.participants.length || !this.scores.length) return;
 
-      // Calculate the result of the game
-      const gameResults = this.participants.map(participant => ({
-        name: participant.name,
-        score: this.calculateTotalScore(participant.name),
-        position: 0 // Will be set below
-      }));
-
-      // Sort by score (highest to lowest) to determine positions
-      gameResults.sort((a, b) => b.score - a.score);
-
-      // Assign positions (1-based, with ties handled)
-      let currentPosition = 1;
-      let previousScore = null;
-
-      gameResults.forEach((result, index) => {
-        if (index > 0 && result.score < previousScore) {
-          currentPosition = index + 1;
-        }
-        result.position = currentPosition;
-        previousScore = result.score;
-      });
-
-      // Create playerStats if it doesn't exist
+      // Inisialisasi playerStats jika belum ada
       if (!this.playerStats) {
         this.playerStats = {};
       }
 
-      // Update stats for each player
-      gameResults.forEach(result => {
-        const playerName = result.name;
-        const isWinner = result.position === 1;
+      // Inisialisasi rekaman pemain jika belum ada
+      this.participants.forEach(participant => {
+        const playerName = participant.name;
 
-        // Initialize player stats if they don't exist
         if (!this.playerStats[playerName]) {
           this.playerStats[playerName] = {
-            totalGames: 0,
-            wins: 0,
-            totalScore: 0,
-            bestScore: -Infinity,
-            worstScore: Infinity,
-            winningStreak: 0,
-            currentStreak: 0,
-            lastPlayed: null
+            totalRounds: 0,          // Total ronde yang dimainkan
+            highestScoreRounds: 0,   // Jumlah ronde dengan skor tertinggi (menang)
+            lowestScoreRounds: 0,    // Jumlah ronde dengan skor terendah (kalah)
+            middleRounds: 0,         // Jumlah ronde dengan skor di tengah
+            totalScore: 0,           // Total skor dari semua ronde
+            bestScore: -Infinity,    // Skor tertinggi yang pernah dicapai
+            worstScore: Infinity,    // Skor terendah yang pernah didapat
+            positiveRounds: 0,       // Ronde yang ditandai positif (👍)
+            negativeRounds: 0,       // Ronde yang ditandai negatif (👎)
+            winStreak: 0,            // Rekor kemenangan berturut-turut
+            currentWinStreak: 0,     // Kemenangan berturut-turut saat ini
+            lossStreak: 0,           // Rekor kekalahan berturut-turut
+            currentLossStreak: 0,    // Kekalahan berturut-turut saat ini
+            lastPlayed: null         // Waktu terakhir bermain
           };
-        }
-
-        const stats = this.playerStats[playerName];
-
-        // Update general stats
-        stats.totalGames += 1;
-        stats.totalScore += result.score;
-        stats.bestScore = Math.max(stats.bestScore, result.score);
-        stats.worstScore = Math.min(stats.worstScore, result.score);
-        stats.lastPlayed = new Date().toISOString();
-
-        // Update win stats
-        if (isWinner) {
-          stats.wins += 1;
-          stats.currentStreak += 1;
-          stats.winningStreak = Math.max(stats.winningStreak, stats.currentStreak);
-        } else {
-          stats.currentStreak = 0;
         }
       });
 
-      // Save updated stats to localStorage
+      // Proses setiap ronde secara terpisah
+      this.scores.forEach((roundScores, roundIndex) => {
+        // Temukan skor tertinggi dan terendah di ronde ini
+        let highestScore = -Infinity;
+        let lowestScore = Infinity;
+
+        // Pass pertama: temukan skor tertinggi dan terendah di ronde ini
+        roundScores.forEach(playerScore => {
+          const score = playerScore.score;
+          if (score > highestScore) highestScore = score;
+          if (score < lowestScore) lowestScore = score;
+        });
+
+        // Pass kedua: update statistik pemain berdasarkan performa mereka di ronde ini
+        roundScores.forEach(playerScore => {
+          const playerName = playerScore.name;
+          const score = playerScore.score;
+          const stats = this.playerStats[playerName];
+
+          // Update statistik dasar
+          stats.totalRounds += 1;
+          stats.totalScore += score;
+          stats.bestScore = Math.max(stats.bestScore, score);
+          stats.worstScore = Math.min(stats.worstScore, score);
+          stats.lastPlayed = new Date().toISOString();
+
+          // Update penghitung ronde positif/negatif berdasarkan tanda
+          if (playerScore.mark === 'positive') {
+            stats.positiveRounds += 1;
+          } else if (playerScore.mark === 'negative') {
+            stats.negativeRounds += 1;
+          }
+
+          // Tentukan apakah pemain mendapat skor tertinggi, terendah, atau di tengah
+          if (score === highestScore) {
+            // Pemain mendapat skor tertinggi di ronde ini (menang)
+            stats.highestScoreRounds += 1;
+            stats.currentWinStreak += 1;
+            stats.winStreak = Math.max(stats.winStreak, stats.currentWinStreak);
+            stats.currentLossStreak = 0; // Reset streak kekalahan
+          } else if (score === lowestScore) {
+            // Pemain mendapat skor terendah di ronde ini (kalah)
+            stats.lowestScoreRounds += 1;
+            stats.currentLossStreak += 1;
+            stats.lossStreak = Math.max(stats.lossStreak, stats.currentLossStreak);
+            stats.currentWinStreak = 0; // Reset streak kemenangan
+          } else {
+            // Pemain mendapat skor di tengah
+            stats.middleRounds += 1;
+            stats.currentWinStreak = 0; // Reset streak kemenangan
+            stats.currentLossStreak = 0; // Reset streak kekalahan
+          }
+        });
+      });
+
+      // Simpan statistik yang diperbarui ke localStorage
       this.savePlayerStatsToLocalStorage();
     },
+
 
     savePlayerStatsToLocalStorage() {
       localStorage.setItem('scoreTrackerPlayerStats', JSON.stringify(this.playerStats));
@@ -1572,18 +1798,66 @@ export default {
     },
 
     addScores() {
-      // All the original code from your addScores method
-      const missingScores = this.participants.some(participant => {
-        return this.currentScore[participant.name] === null ||
-          this.currentScore[participant.name] === undefined ||
-          this.currentScore[participant.name] === '';
+      // Cek apakah ada skor yang belum diisi
+      const missingScores = [];
+      let hasMissingScores = false;
+
+      this.participants.forEach(participant => {
+        const scoreValue = this.currentScore[participant.name];
+        if (scoreValue === null || scoreValue === undefined || scoreValue === '') {
+          missingScores.push(participant.name);
+          hasMissingScores = true;
+        }
       });
 
-      if (missingScores) {
-        alert('Harap isi semua skor player sebelum menambahkan!');
+      if (hasMissingScores) {
+        // Buat pesan error yang lebih informatif
+        let errorMessage = 'Skor belum lengkap!\n\n';
+
+        if (missingScores.length === 1) {
+          errorMessage += `Harap isi skor untuk player: ${missingScores[0]}`;
+        } else {
+          errorMessage += 'Harap isi skor untuk player berikut:\n';
+          missingScores.forEach((name, index) => {
+            errorMessage += `${index + 1}. ${name}\n`;
+          });
+        }
+
+        // Tampilkan pesan error dengan dialog yang lebih baik
+        this.showValidationError(errorMessage);
         return;
       }
 
+      // Validasi nilai skor (opsional - tambahkan jika diperlukan)
+      const invalidScores = [];
+      let hasInvalidScores = false;
+
+      this.participants.forEach(participant => {
+        const scoreValue = this.currentScore[participant.name];
+        // Contoh validasi: pastikan skor adalah angka valid
+        if (isNaN(scoreValue) || !Number.isFinite(scoreValue)) {
+          invalidScores.push(participant.name);
+          hasInvalidScores = true;
+        }
+      });
+
+      if (hasInvalidScores) {
+        let errorMessage = 'Ada skor yang tidak valid!\n\n';
+
+        if (invalidScores.length === 1) {
+          errorMessage += `Skor untuk ${invalidScores[0]} harus berupa angka yang valid.`;
+        } else {
+          errorMessage += 'Skor untuk player berikut harus berupa angka yang valid:\n';
+          invalidScores.forEach((name, index) => {
+            errorMessage += `${index + 1}. ${name}\n`;
+          });
+        }
+
+        this.showValidationError(errorMessage);
+        return;
+      }
+
+      // Jika semua validasi berhasil, lanjutkan proses penambahan skor
       const newScoreEntry = this.participants.map(participant => ({
         name: participant.name,
         score: this.currentScore[participant.name] || 0,
@@ -1592,19 +1866,128 @@ export default {
 
       this.scores.push(newScoreEntry);
 
-      // Save to localStorage
+      // Simpan ke localStorage
       this.saveToLocalStorage();
 
-      // If in live mode and is host, sync to Firebase
+      // Jika dalam mode live dan sebagai host, sinkronkan ke Firebase
       if (this.liveMode && this.isHost) {
         this.syncToFirebase();
       }
 
-      // Reset input fields and marks
+      // Reset input fields dan marks
       this.participants.forEach(participant => {
         this.currentScore[participant.name] = null;
         this.scoreMarks[participant.name] = null;
       });
+
+      // Tampilkan feedback positif
+    },
+
+    showValidationError(message) {
+      // Tampilkan dialog error yang lebih modern dan informatif
+      if (this.hasCustomDialog) {
+        // Gunakan dialog kustom jika tersedia
+        this.showErrorDialog('Validasi Gagal', message);
+      } else {
+        // Fallback ke alert standar
+        alert(message);
+      }
+
+      // Highlight form yang belum diisi
+      this.highlightEmptyFields();
+    },
+
+    // Metode untuk menampilkan notifikasi sukses
+    showSuccessNotification(message) {
+      if (this.hasCustomDialog) {
+        this.showSuccessDialog('Berhasil', message);
+      } else {
+        // Jika ingin menggunakan notifikasi non-modal, bisa tambahkan kode disini
+        // Contoh: tampilkan toast notification atau pesan yang hilang otomatis
+
+        // Sementara gunakan alert sederhana
+        // alert(message); // dimatikan agar tidak mengganggu
+
+        // Menampilkan toast notification
+        this.showToast(message, 'success');
+      }
+    },
+
+    // Metode untuk highlight field kosong
+    highlightEmptyFields() {
+      this.$nextTick(() => {
+        this.participants.forEach(participant => {
+          const scoreValue = this.currentScore[participant.name];
+          const inputElement = document.getElementById(participant.name);
+
+          if (inputElement) {
+            if (scoreValue === null || scoreValue === undefined || scoreValue === '') {
+              // Tambahkan class untuk highlight field kosong
+              inputElement.classList.add('empty-field');
+
+              // Hapus class setelah beberapa saat atau ketika nilai berubah
+              const removeHighlight = () => {
+                inputElement.classList.remove('empty-field');
+                inputElement.removeEventListener('input', removeHighlight);
+              };
+
+              inputElement.addEventListener('input', removeHighlight);
+
+              // Atau hapus highlight setelah 3 detik
+              setTimeout(removeHighlight, 3000);
+            } else {
+              inputElement.classList.remove('empty-field');
+            }
+          }
+        });
+      });
+    },
+
+    showToast(message, type = 'info') {
+      // Buat elemen toast jika belum ada
+      let toastContainer = document.querySelector('.toast-container');
+
+      if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+      }
+
+      // Buat toast baru
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerHTML = `
+    <div class="toast-content">
+      <span class="toast-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+      <span class="toast-message">${message}</span>
+    </div>
+    <button class="toast-close">×</button>
+  `;
+
+      // Tambahkan toast ke container
+      toastContainer.appendChild(toast);
+
+      // Animasi masuk
+      setTimeout(() => {
+        toast.classList.add('show');
+      }, 10);
+
+      // Tambahkan event listener untuk tombol close
+      const closeButton = toast.querySelector('.toast-close');
+      closeButton.addEventListener('click', () => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      });
+
+      // Hilangkan toast secara otomatis setelah beberapa detik
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          toast.remove();
+        }, 300);
+      }, 3000);
     },
 
     markScorePositive(participantName) {
@@ -2126,6 +2509,259 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.win-count {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.middle-count {
+  color: #6B7280;
+}
+
+.loss-count {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+.win-rate-cell {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.loss-rate-cell {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+.win-streak-cell {
+  color: #8B5CF6;
+  font-weight: 600;
+}
+
+.loss-streak-cell {
+  color: #F59E0B;
+  font-weight: 600;
+}
+
+.positive-impact {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.negative-impact {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+/* Style untuk baris peringkat */
+.leaderboard-table tr.rank-first td,
+.viewer-leaderboard-table tr.rank-first td {
+  background-color: rgba(255, 215, 0, 0.1);
+  border-top: 1px solid rgba(255, 215, 0, 0.4);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.4);
+}
+
+.leaderboard-table tr.rank-first .rank-cell,
+.viewer-leaderboard-table tr.rank-first .rank-cell {
+  position: relative;
+}
+
+.leaderboard-table tr.rank-first .rank-cell:before,
+.viewer-leaderboard-table tr.rank-first .rank-cell:before {
+  content: "👑";
+  font-size: 0.85rem;
+  position: absolute;
+  top: -0.5rem;
+  right: -0.2rem;
+}
+
+.leaderboard-table tr.rank-second td,
+.viewer-leaderboard-table tr.rank-second td {
+  background-color: rgba(192, 192, 192, 0.1);
+  border-top: 1px solid rgba(192, 192, 192, 0.4);
+  border-bottom: 1px solid rgba(192, 192, 192, 0.4);
+}
+
+.leaderboard-table tr.rank-third td,
+.viewer-leaderboard-table tr.rank-third td {
+  background-color: rgba(205, 127, 50, 0.1);
+  border-top: 1px solid rgba(205, 127, 50, 0.4);
+  border-bottom: 1px solid rgba(205, 127, 50, 0.4);
+}
+
+/* Style yang ditingkatkan untuk level badge */
+.player-level {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.player-level:hover {
+  transform: scale(1.05);
+}
+
+.level-newbie {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.level-beginner {
+  background-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.level-intermediate {
+  background-color: #a7f3d0;
+  color: #065f46;
+}
+
+.level-advanced {
+  background-color: #fde68a;
+  color: #92400e;
+}
+
+.level-pro {
+  background-color: #fed7aa;
+  color: #9a3412;
+}
+
+.level-legend {
+  background-color: #fbcfe8;
+  color: #831843;
+  animation: glow 2s infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 2px #fbcfe8, 0 0 4px #ec4899;
+  }
+
+  to {
+    box-shadow: 0 0 4px #fbcfe8, 0 0 8px #ec4899;
+  }
+}
+
+/* Style tooltip data kolom yang ditingkatkan */
+th[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+th[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 200px;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #1f2937;
+  color: white;
+  font-size: 0.75rem;
+  text-align: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 10;
+  pointer-events: none;
+}
+
+th[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Style untuk panel penjelasan level */
+.level-explanation {
+  margin-top: 1.5rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.level-explanation h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  color: #374151;
+  text-align: center;
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.level-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.level-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.level-item .player-level {
+  align-self: flex-start;
+}
+
+.level-item p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+/* Style untuk legenda level di viewer mode */
+.viewer-level-legend {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.level-legend-title {
+  font-size: 0.875rem;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.level-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.level-legend-item {
+  display: flex;
+  align-items: center;
+}
+
 .viewer-leaderboard {
   margin-top: 2rem;
   padding: 1rem;
@@ -2510,6 +3146,141 @@ export default {
   color: #374151;
 }
 
+.positive-impact {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.negative-impact {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+.streak-cell {
+  font-weight: 600;
+  color: #8B5CF6;
+}
+
+/* Enhanced level badges with improved visibility */
+.player-level {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.level-newbie {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+.level-beginner {
+  background-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.level-intermediate {
+  background-color: #a7f3d0;
+  color: #065f46;
+}
+
+.level-advanced {
+  background-color: #fde68a;
+  color: #92400e;
+}
+
+.level-pro {
+  background-color: #fed7aa;
+  color: #9a3412;
+}
+
+.level-legend {
+  background-color: #fbcfe8;
+  color: #831843;
+  animation: glow 2s infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 2px #fbcfe8, 0 0 4px #ec4899;
+  }
+
+  to {
+    box-shadow: 0 0 4px #fbcfe8, 0 0 8px #ec4899;
+  }
+}
+
+/* Updated tooltips for level explanations */
+.player-level {
+  position: relative;
+  cursor: pointer;
+}
+
+.player-level::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 200px;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #1f2937;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 10;
+}
+
+.player-level:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Add tooltips for data columns */
+th[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+
+th[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 200px;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #1f2937;
+  color: white;
+  font-size: 0.75rem;
+  text-align: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 10;
+}
+
+th[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+
 .copy-url-btn {
   background-color: #6B7280;
   color: white;
@@ -2610,6 +3381,282 @@ export default {
 
 .leaderboard-content {
   padding: 1rem;
+}
+
+.empty-field {
+  border: 2px solid #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+  animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes shake {
+
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0);
+  }
+
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-3px, 0, 0);
+  }
+
+  40%,
+  60% {
+    transform: translate3d(3px, 0, 0);
+  }
+}
+
+/* Dialog Kustom */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.dialog {
+  background-color: white;
+  border-radius: 0.5rem;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #111827;
+  font-weight: 600;
+}
+
+.dialog-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+.dialog-close:hover {
+  color: #111827;
+}
+
+.dialog-content {
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.dialog-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.dialog-message {
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.dialog-footer {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dialog-button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dialog-confirm-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+}
+
+.dialog-confirm-button:hover {
+  background-color: #2563eb;
+}
+
+.dialog-cancel-button {
+  background-color: white;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.dialog-cancel-button:hover {
+  background-color: #f3f4f6;
+}
+
+.dialog-danger-button {
+  background-color: #ef4444;
+}
+
+.dialog-danger-button:hover {
+  background-color: #dc2626;
+}
+
+/* Styling untuk jenis dialog */
+.dialog-success .dialog-icon {
+  color: #10b981;
+}
+
+.dialog-error .dialog-icon {
+  color: #ef4444;
+}
+
+.dialog-warning .dialog-icon {
+  color: #f59e0b;
+}
+
+.dialog-info .dialog-icon {
+  color: #3b82f6;
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 350px;
+  z-index: 9999;
+}
+
+.toast {
+  background-color: white;
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toast-icon {
+  font-size: 1.25rem;
+}
+
+.toast-message {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.toast-close:hover {
+  color: #4b5563;
+}
+
+/* Styling untuk jenis toast */
+.toast-success {
+  border-left: 4px solid #10b981;
+}
+
+.toast-success .toast-icon {
+  color: #10b981;
+}
+
+.toast-error {
+  border-left: 4px solid #ef4444;
+}
+
+.toast-error .toast-icon {
+  color: #ef4444;
+}
+
+.toast-warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.toast-warning .toast-icon {
+  color: #f59e0b;
+}
+
+.toast-info {
+  border-left: 4px solid #3b82f6;
+}
+
+.toast-info .toast-icon {
+  color: #3b82f6;
 }
 
 .no-leaderboard {
@@ -2797,6 +3844,40 @@ export default {
 
 /* Responsive styles */
 @media (max-width: 768px) {
+  .dialog {
+    width: 95%;
+    max-width: none;
+  }
+
+  .toast-container {
+    width: 90%;
+    max-width: none;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .toast {
+    width: 100%;
+  }
+
+  .leaderboard-table,
+  .viewer-leaderboard-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .level-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .leaderboard-table {
+    /* Allow horizontal scrolling on smaller screens */
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
   .viewer-leaderboard-filters {
     flex-direction: column;
     align-items: stretch;
