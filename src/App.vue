@@ -583,7 +583,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 // Import Firebase Realtime Database
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref as dbRef, set, onValue, off, remove, update, onDisconnect } from "firebase/database";
+import { getDatabase, ref as dbRef, set, get, onValue, off, remove, update, onDisconnect } from "firebase/database";
 import { getAnalytics } from "firebase/analytics";
 
 // Firebase configuration
@@ -779,14 +779,22 @@ export default {
     // Load saved data when component is created
     this.loadSavedState();
 
-    // Load history data
-    this.loadHistoryFromLocalStorage();
-
-    // Load player stats
-    this.loadPlayerStatsFromLocalStorage();
-
-    // Check URL for room parameter
-    this.checkForRoomInUrl();
+    // Coba muat riwayat permainan dan statistik dari Firebase terlebih dahulu
+    // kemudian fallback ke localStorage jika gagal
+    Promise.all([
+      this.loadGameHistoryFromFirebase(),
+      this.loadPlayerStatsFromFirebase()
+    ])
+      .catch(error => {
+        console.error('Error memuat data dari Firebase:', error);
+        // Fallback ke localStorage jika gagal
+        this.loadHistoryFromLocalStorage();
+        this.loadPlayerStatsFromLocalStorage();
+      })
+      .finally(() => {
+        // Check URL for room parameter
+        this.checkForRoomInUrl();
+      });
   },
   beforeUnmount() {
     // Detach all Firebase listeners
@@ -1112,6 +1120,8 @@ export default {
           }
         });
       });
+      // Sinkronkan ke Firebase
+      this.syncPlayerStatsToFirebase();
 
       // Simpan statistik yang diperbarui ke localStorage
       this.savePlayerStatsToLocalStorage();
@@ -1131,6 +1141,145 @@ export default {
           console.error('Error parsing saved player stats:', e);
           this.playerStats = {};
         }
+      } else {
+        this.playerStats = {};
+      }
+    },
+
+    saveGameHistoryToFirebase() {
+      // Jika tidak ada riwayat permainan, tidak perlu menyimpan
+      if (!this.gameHistory || this.gameHistory.length === 0) return;
+
+      // Referensi ke node riwayat permainan global
+      const historyRef = dbRef(database, `gameHistory/global`);
+
+      // Gunakan push untuk menambahkan ke array
+      set(historyRef, this.gameHistory)
+        .then(() => {
+          console.log('Riwayat permainan berhasil disimpan ke Firebase');
+        })
+        .catch(error => {
+          console.error('Error menyimpan riwayat permainan ke Firebase:', error);
+          // Fallback ke localStorage jika gagal
+          this.saveHistoryToLocalStorage();
+        });
+    },
+
+    // Metode untuk menyimpan satu permainan ke riwayat di Firebase
+    saveGameToHistory() {
+      if (this.participants.length === 0 || this.scores.length === 0) {
+        return;
+      }
+
+      // Update player stats
+      this.updatePlayerStats();
+
+      // Buat rekaman permainan baru
+      const gameRecord = {
+        date: new Date().toISOString(),
+        participants: JSON.parse(JSON.stringify(this.participants)),
+        scores: JSON.parse(JSON.stringify(this.scores))
+      };
+
+      // Tambahkan ke array riwayat lokal
+      this.gameHistory.push(gameRecord);
+
+      // Simpan ke localStorage sebagai backup
+      this.saveHistoryToLocalStorage();
+
+      // Jika dalam mode host, simpan ke Firebase
+      if (this.isHost) {
+        // Referensi ke node riwayat permainan
+        const historyRef = dbRef(database, `gameHistory/global`);
+
+        // Update data di Firebase
+        set(historyRef, this.gameHistory)
+          .then(() => {
+            console.log('Permainan berhasil disimpan ke riwayat di Firebase');
+            // Tampilkan notifikasi
+            alert('Permainan telah disimpan ke riwayat!');
+          })
+          .catch(error => {
+            console.error('Error menyimpan permainan ke riwayat di Firebase:', error);
+            // Tampilkan notifikasi meskipun error (karena sudah disimpan di localStorage)
+            alert('Permainan telah disimpan ke riwayat! (Hanya lokal)');
+          });
+      } else {
+        // Tampilkan notifikasi
+        alert('Permainan telah disimpan ke riwayat!');
+      }
+    },
+
+    // Metode untuk memuat riwayat permainan dari Firebase
+    loadGameHistoryFromFirebase() {
+      // Referensi ke node riwayat permainan global
+      const historyRef = dbRef(database, `gameHistory/global`);
+
+      // Ambil data
+      return get(historyRef)
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+            // Update gameHistory lokal dengan data dari Firebase
+            const firebaseHistory = snapshot.val();
+
+            // Periksa apakah data memiliki format yang benar
+            if (Array.isArray(firebaseHistory)) {
+              this.gameHistory = firebaseHistory;
+              console.log('Riwayat permainan berhasil dimuat dari Firebase');
+            } else {
+              console.warn('Format data riwayat di Firebase tidak valid');
+              // Coba muat dari localStorage
+              this.loadHistoryFromLocalStorage();
+            }
+          } else {
+            console.log('Tidak ada data riwayat permainan di Firebase, menggunakan data lokal');
+            // Jika tidak ada data di Firebase, coba muat dari localStorage
+            this.loadHistoryFromLocalStorage();
+          }
+        })
+        .catch((error) => {
+          console.error('Error memuat riwayat permainan dari Firebase:', error);
+          // Fallback ke localStorage jika gagal
+          this.loadHistoryFromLocalStorage();
+        });
+    },
+
+    // Metode untuk menghapus satu riwayat permainan di Firebase
+    executeDeleteGameHistory(index) {
+      if (index < 0 || index >= this.gameHistory.length) {
+        return;
+      }
+
+      // Hapus dari array lokal
+      this.gameHistory.splice(index, 1);
+
+      // Simpan ke localStorage sebagai backup
+      this.saveHistoryToLocalStorage();
+
+      // Reset tampilan detail jika perlu
+      if (this.expandedHistory === index) {
+        this.expandedHistory = null;
+      } else if (this.expandedHistory > index) {
+        this.expandedHistory--;
+      }
+
+      // Jika dalam mode host, perbarui di Firebase
+      if (this.isHost) {
+        // Referensi ke node riwayat permainan
+        const historyRef = dbRef(database, `gameHistory/global`);
+
+        // Update data di Firebase
+        set(historyRef, this.gameHistory)
+          .then(() => {
+            console.log('Riwayat permainan berhasil dihapus di Firebase');
+            // Tampilkan notifikasi toast sukses
+            this.showToast('Riwayat permainan berhasil dihapus', 'success');
+          })
+          .catch(error => {
+            console.error('Error menghapus riwayat permainan di Firebase:', error);
+            // Tampilkan notifikasi error
+            this.showToast('Riwayat berhasil dihapus secara lokal, tetapi gagal diperbarui di server', 'warning');
+          });
       }
     },
 
@@ -2118,6 +2267,101 @@ export default {
           this.joinLiveRoom(roomId);
         }, 1000);
       }
+    },
+
+    savePlayerStatsToFirebase() {
+      // Jika tidak dalam mode host atau tidak memiliki roomId, hanya simpan di localStorage
+      if (!this.isHost || !this.roomId) {
+        this.savePlayerStatsToLocalStorage();
+        return;
+      }
+
+      // Simpan ke Firebase
+      const statsRef = dbRef(database, `leaderboards/global`);
+
+      // Update data dari database dengan playerStats lokal
+      update(statsRef, this.playerStats)
+        .then(() => {
+          console.log('Leaderboard berhasil disimpan ke Firebase');
+        })
+        .catch(error => {
+          console.error('Error menyimpan leaderboard ke Firebase:', error);
+          // Fallback ke localStorage jika gagal
+          this.savePlayerStatsToLocalStorage();
+        });
+    },
+
+    // Metode untuk memuat data leaderboard dari Firebase
+    loadPlayerStatsFromFirebase() {
+      // Dapatkan referensi ke node leaderboard global
+      const statsRef = dbRef(database, `leaderboards/global`);
+
+      // Ambil data
+      return get(statsRef)
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+            // Update playerStats lokal dengan data dari Firebase
+            const firebaseStats = snapshot.val();
+
+            // Pastikan kita mempertahankan struktur data yang benar
+            this.playerStats = this.playerStats || {};
+
+            // Merge data dari Firebase dengan data lokal
+            for (const playerName in firebaseStats) {
+              // Jika ada data lokal untuk pemain ini, gabungkan dengan data dari Firebase
+              if (this.playerStats[playerName]) {
+                // Prioritaskan data dengan nilai tertinggi untuk setiap properti
+                const localStats = this.playerStats[playerName];
+                const remoteStats = firebaseStats[playerName];
+
+                for (const stat in remoteStats) {
+                  // Jika properti adalah angka, ambil nilai tertinggi
+                  if (typeof remoteStats[stat] === 'number') {
+                    localStats[stat] = Math.max(
+                      localStats[stat] || 0,
+                      remoteStats[stat] || 0
+                    );
+                  }
+                  // Jika lastPlayed, ambil tanggal terbaru
+                  else if (stat === 'lastPlayed' && remoteStats[stat] && localStats[stat]) {
+                    const remoteDate = new Date(remoteStats[stat]);
+                    const localDate = new Date(localStats[stat]);
+                    if (remoteDate > localDate) {
+                      localStats[stat] = remoteStats[stat];
+                    }
+                  }
+                  // Untuk properti lain, gunakan data dari Firebase jika tidak ada di lokal
+                  else if (localStats[stat] === undefined) {
+                    localStats[stat] = remoteStats[stat];
+                  }
+                }
+              }
+              // Jika tidak ada data lokal untuk pemain ini, gunakan data dari Firebase
+              else {
+                this.playerStats[playerName] = firebaseStats[playerName];
+              }
+            }
+
+            console.log('Leaderboard berhasil dimuat dari Firebase');
+          } else {
+            console.log('Tidak ada data leaderboard di Firebase, menggunakan data lokal');
+            // Jika tidak ada data di Firebase, coba muat dari localStorage
+            this.loadPlayerStatsFromLocalStorage();
+          }
+        })
+        .catch((error) => {
+          console.error('Error memuat leaderboard dari Firebase:', error);
+          // Fallback ke localStorage jika gagal
+          this.loadPlayerStatsFromLocalStorage();
+        });
+    },
+
+    syncPlayerStatsToFirebase() {
+      // Jika tidak dalam mode host atau tidak memiliki roomId, jangan sinkronkan
+      if (!this.isHost || !this.roomId) return;
+
+      // Perbarui data di Firebase
+      this.savePlayerStatsToFirebase();
     },
 
     resetData() {
